@@ -12,7 +12,10 @@ use hbb_common::fs::serialize_transfer_job;
 use hbb_common::tokio::sync::mpsc::unbounded_channel;
 use hbb_common::{
     allow_err, bail,
-    config::{keys::OPTION_FILE_TRANSFER_MAX_FILES, Config},
+    config::{
+        keys::{OPTION_ENABLE_PERM_CHANGE_IN_ACCEPT_WINDOW, OPTION_FILE_TRANSFER_MAX_FILES},
+        option2bool, Config,
+    },
     fs::{self, get_string, is_write_need_confirmation, new_send_confirm, DigestCheckResult},
     log,
     message_proto::*,
@@ -25,10 +28,7 @@ use hbb_common::{
     ResultType,
 };
 #[cfg(target_os = "windows")]
-use hbb_common::{
-    config::{keys::*, option2bool},
-    tokio::sync::Mutex as TokioMutex,
-};
+use hbb_common::{config::keys::*, tokio::sync::Mutex as TokioMutex};
 use serde_derive::Serialize;
 #[cfg(any(target_os = "android", target_os = "ios", feature = "flutter"))]
 use std::iter::FromIterator;
@@ -143,6 +143,7 @@ pub struct Client {
     pub restart: bool,
     pub recording: bool,
     pub block_input: bool,
+    pub privacy_mode: bool,
     pub from_switch: bool,
     pub in_voice_call: bool,
     pub incoming_voice_call: bool,
@@ -230,6 +231,7 @@ impl<T: InvokeUiCM> ConnectionManager<T> {
         restart: bool,
         recording: bool,
         block_input: bool,
+        privacy_mode: bool,
         from_switch: bool,
         #[cfg(not(any(target_os = "ios")))] tx: mpsc::UnboundedSender<Data>,
     ) {
@@ -251,6 +253,7 @@ impl<T: InvokeUiCM> ConnectionManager<T> {
             restart,
             recording,
             block_input,
+            privacy_mode,
             from_switch,
             #[cfg(not(any(target_os = "ios")))]
             tx,
@@ -374,6 +377,15 @@ pub fn close(id: i32) {
     };
 }
 
+/// Like `close`, but says the CM's WINDOW closed rather than a person disconnecting this peer.
+/// See `ipc::Data::CmWindowClosed`.
+#[cfg(target_os = "linux")]
+pub fn close_window(id: i32) {
+    if let Some(client) = CLIENTS.read().unwrap().get(&id) {
+        allow_err!(client.tx.send(Data::CmWindowClosed));
+    };
+}
+
 #[inline]
 pub fn remove(id: i32) {
     CLIENTS.write().unwrap().remove(&id);
@@ -392,6 +404,23 @@ pub fn send_chat(id: i32, text: String) {
 #[inline]
 #[cfg(not(any(target_os = "ios")))]
 pub fn switch_permission(id: i32, name: String, enabled: bool) {
+    #[cfg(target_os = "android")]
+    let is_keyboard_permission = name == "keyboard";
+    #[cfg(not(target_os = "android"))]
+    let is_keyboard_permission = false;
+    if !option2bool(
+        OPTION_ENABLE_PERM_CHANGE_IN_ACCEPT_WINDOW,
+        &crate::get_builtin_option(OPTION_ENABLE_PERM_CHANGE_IN_ACCEPT_WINDOW),
+    ) && !is_keyboard_permission
+    {
+        log::info!(
+            "blocked cm switch_permission by policy, conn_id={}, permission={}, enabled={}",
+            id,
+            name,
+            enabled
+        );
+        return;
+    }
     if let Some(client) = CLIENTS.read().unwrap().get(&id) {
         allow_err!(client.tx.send(Data::SwitchPermission { name, enabled }));
     };
@@ -400,6 +429,19 @@ pub fn switch_permission(id: i32, name: String, enabled: bool) {
 #[inline]
 #[cfg(target_os = "android")]
 pub fn switch_permission_all(name: String, enabled: bool) {
+    if name != "keyboard"
+        && !option2bool(
+            OPTION_ENABLE_PERM_CHANGE_IN_ACCEPT_WINDOW,
+            &crate::get_builtin_option(OPTION_ENABLE_PERM_CHANGE_IN_ACCEPT_WINDOW),
+        )
+    {
+        log::info!(
+            "blocked cm switch_permission_all by policy, permission={}, enabled={}",
+            name,
+            enabled
+        );
+        return;
+    }
     for (_, client) in CLIENTS.read().unwrap().iter() {
         allow_err!(client.tx.send(Data::SwitchPermission {
             name: name.clone(),
@@ -423,8 +465,15 @@ pub fn get_clients_length() -> usize {
 }
 
 #[inline]
+#[cfg(target_os = "android")]
+pub fn has_active_clients() -> bool {
+    let clients = CLIENTS.read().unwrap();
+    clients.values().any(|c| !c.disconnected)
+}
+
+#[inline]
 #[cfg(feature = "flutter")]
-#[cfg(not(any(target_os = "ios")))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub fn switch_back(id: i32) {
     if let Some(client) = CLIENTS.read().unwrap().get(&id) {
         allow_err!(client.tx.send(Data::SwitchSidesBack));
@@ -503,9 +552,9 @@ impl<T: InvokeUiCM> IpcTaskRunner<T> {
                         }
                         Ok(Some(data)) => {
                             match data {
-                                Data::Login{id, is_file_transfer, is_view_camera, is_terminal, port_forward, peer_id, name, avatar, authorized, keyboard, clipboard, audio, file, file_transfer_enabled: _file_transfer_enabled, restart, recording, block_input, from_switch} => {
+                                Data::Login{id, is_file_transfer, is_view_camera, is_terminal, port_forward, peer_id, name, avatar, authorized, keyboard, clipboard, audio, file, file_transfer_enabled: _file_transfer_enabled, restart, recording, block_input, privacy_mode, from_switch} => {
                                     log::debug!("conn_id: {}", id);
-                                    self.cm.add_connection(id, is_file_transfer, is_view_camera, is_terminal, port_forward, peer_id, name, avatar, authorized, keyboard, clipboard, audio, file, restart, recording, block_input, from_switch, self.tx.clone());
+                                    self.cm.add_connection(id, is_file_transfer, is_view_camera, is_terminal, port_forward, peer_id, name, avatar, authorized, keyboard, clipboard, audio, file, restart, recording, block_input, privacy_mode, from_switch, self.tx.clone());
                                     self.conn_id = id;
                                     #[cfg(target_os = "windows")]
                                     {
@@ -532,6 +581,26 @@ impl<T: InvokeUiCM> IpcTaskRunner<T> {
                                 }
                                 Data::ChatMessage { text } => {
                                     self.cm.new_message(self.conn_id, text);
+                                }
+                                Data::SwitchPermission { name, enabled } => {
+                                    // Keep this branch scoped to privacy mode rollback.
+                                    // Other CM permission toggles are updated optimistically by the UI itself.
+                                    // The backend currently sends SwitchPermission back to CM only when
+                                    // privacy-mode turn-off fails and the UI state must be restored.
+                                    if name == "privacy_mode" {
+                                        let client = {
+                                            let mut clients = CLIENTS.write().unwrap();
+                                            clients.get_mut(&self.conn_id).map(|c| {
+                                                c.privacy_mode = enabled;
+                                                c.clone()
+                                            })
+                                        };
+                                        if let Some(client) = client {
+                                            // This reuses add_connection(), and cm.tis only selectively updates
+                                            // existing rows (authorized/privacy_mode) for this fallback path.
+                                            self.cm.ui_handler.add_connection(&client);
+                                        }
+                                    }
                                 }
                                 Data::FS(mut fs) => {
                                     if let ipc::FS::WriteBlock { id, file_num, data: _, compressed } = fs {
@@ -835,6 +904,7 @@ pub async fn start_listen<T: InvokeUiCM>(
                 restart,
                 recording,
                 block_input,
+                privacy_mode,
                 from_switch,
                 ..
             }) => {
@@ -856,6 +926,7 @@ pub async fn start_listen<T: InvokeUiCM>(
                     restart,
                     recording,
                     block_input,
+                    privacy_mode,
                     from_switch,
                     tx.clone(),
                 );
@@ -906,6 +977,61 @@ async fn handle_fs(
     tx_log: Option<&UnboundedSender<String>>,
     _conn_id: i32,
 ) {
+    // Android is scoped-storage only, so every peer supplied path has to stay inside the
+    // app workspace. This is the filesystem boundary, keep it enforced here even though
+    // `Connection` rejects out-of-workspace requests earlier as well.
+    #[cfg(target_os = "android")]
+    {
+        // (path, job id, file num, allow empty) of the peer supplied path this message
+        // acts on.
+        let checked: Option<(&str, i32, i32, bool)> = match &fs {
+            ipc::FS::ReadEmptyDirs { dir, .. } => Some((dir.as_str(), -1, -1, false)),
+            ipc::FS::ReadDir { dir, .. } => Some((dir.as_str(), -1, -1, true)),
+            ipc::FS::RemoveDir { path, id, .. } | ipc::FS::CreateDir { path, id } => {
+                Some((path.as_str(), *id, 0, false))
+            }
+            ipc::FS::Rename { path, id, .. } => Some((path.as_str(), *id, 0, false)),
+            ipc::FS::RemoveFile { path, id, file_num } => {
+                Some((path.as_str(), *id, *file_num, false))
+            }
+            ipc::FS::ReadAllFiles { path, id, .. } => Some((path.as_str(), *id, -1, false)),
+            ipc::FS::NewWrite {
+                path, id, file_num, ..
+            }
+            | ipc::FS::ReadFile {
+                path, id, file_num, ..
+            } => Some((path.as_str(), *id, *file_num, false)),
+            _ => None,
+        };
+        if let Some((path, id, file_num, allow_empty)) = checked {
+            if !crate::common::is_peer_path_allowed(path, allow_empty) {
+                log::warn!("Reject file operation outside the app workspace: {}", path);
+                if id >= 0 {
+                    send_raw(fs::new_error(id, "Permission denied", file_num), tx);
+                }
+                return;
+            }
+        }
+        if let ipc::FS::Rename { path, new_name, id } = &fs {
+            let destination = std::path::Path::new(path)
+                .parent()
+                .map(|parent| parent.join(new_name));
+            let allowed = destination
+                .as_deref()
+                .and_then(std::path::Path::to_str)
+                .map_or(false, |path| {
+                    crate::common::is_peer_path_allowed(path, false)
+                });
+            if !allowed {
+                log::warn!(
+                    "Reject rename destination outside the app workspace: {:?}",
+                    destination
+                );
+                send_raw(fs::new_error(*id, "Permission denied", 0), tx);
+                return;
+            }
+        }
+    }
     match fs {
         ipc::FS::ReadEmptyDirs {
             dir,
@@ -1475,13 +1601,19 @@ async fn read_dir(dir: &str, include_hidden: bool, tx: &UnboundedSender<Data>) {
             fs::get_path(dir)
         }
     };
-    if let Ok(Ok(fd)) = spawn_blocking(move || fs::read_dir(&path, include_hidden)).await {
-        let mut msg_out = Message::new();
-        let mut file_response = FileResponse::new();
-        file_response.set_dir(fd);
-        msg_out.set_file_response(file_response);
-        send_raw(msg_out, tx);
-    }
+    let result = spawn_blocking(move || fs::read_dir(&path, include_hidden)).await;
+    let msg_out = match result {
+        Ok(Ok(fd)) => {
+            let mut msg_out = Message::new();
+            let mut file_response = FileResponse::new();
+            file_response.set_dir(fd);
+            msg_out.set_file_response(file_response);
+            msg_out
+        }
+        Ok(Err(err)) => fs::new_error(0, err, -1),
+        Err(err) => fs::new_error(0, err, -1),
+    };
+    send_raw(msg_out, tx);
 }
 
 #[cfg(not(any(target_os = "ios")))]
@@ -1624,6 +1756,19 @@ pub fn quit_cm() {
     // in case of std::process::exit not work
     log::info!("quit cm");
     CLIENTS.write().unwrap().clear();
+    // `quit_gui()` ends the process on Windows and macOS, but on Linux it calls
+    // `gtk_main_quit()`, which has no effect in the Flutter connection manager:
+    // `flutter/linux/main.cc` runs `g_application_run()` (GtkApplication), so
+    // `gtk_main()` is never called. Exit directly instead, otherwise this
+    // process keeps running while no longer serving the `_cm` ipc endpoint, so
+    // the server can't reuse it and spawns one more connection manager.
+    //
+    // NOTE: a client merely disconnecting does not come here, the Flutter side
+    // closes the window then, so this is a fallback rather than an explanation
+    // for the stale processes of #15698.
+    #[cfg(all(target_os = "linux", feature = "flutter"))]
+    std::process::exit(0);
+    #[cfg(not(all(target_os = "linux", feature = "flutter")))]
     crate::platform::quit_gui();
 }
 
@@ -1666,7 +1811,7 @@ mod tests {
 
     #[test]
     #[cfg(not(any(target_os = "ios")))]
-    fn read_dir_success() {
+    fn read_dir_reports_success_and_error() {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let (tx, mut rx) = unbounded_channel();
@@ -1689,6 +1834,18 @@ mod tests {
                 _ => panic!("unexpected data"),
             }
             let _ = fs::remove_dir_all(&dir);
+
+            super::read_dir(&dir.to_string_lossy(), false, &tx).await;
+
+            match rx.recv().await.unwrap() {
+                Data::RawMessage(bytes) => {
+                    let mut msg = Message::new();
+                    msg.merge_from_bytes(&bytes).unwrap();
+                    assert_eq!(msg.file_response().error().id, 0);
+                    assert!(!msg.file_response().error().error.is_empty());
+                }
+                _ => panic!("unexpected data"),
+            }
         });
     }
 

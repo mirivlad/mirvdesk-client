@@ -346,7 +346,7 @@ class InputModel {
   /// which runs per-engine, so each isolate registers its own handler tied
   /// to its own set of InputModels.
   static void initSideButtonChannel() {
-    if (!Platform.isLinux) return;
+    if (!isLinux) return;
     if (_sideButtonChannelInitialized) return;
     _sideButtonChannelInitialized = true;
 
@@ -473,6 +473,10 @@ class InputModel {
   List<RemoteWindowCoords> _remoteWindowCoords = [];
 
   late final SessionID sessionId;
+
+  // Local gate for clipboard-assisted input flows on mobile Wayland dialogs.
+  // It should not block physical keyboard events.
+  bool keyboardInputAllowed = true;
 
   bool get keyboardPerm => parent.target!.ffiModel.keyboard;
   String get id => parent.target?.id ?? '';
@@ -1303,7 +1307,8 @@ class InputModel {
     }
     if (isPhysicalMouse.value) {
       if (!_relativeMouse.handleRelativeMouseMove(e.localPosition)) {
-        handleMouse(_getMouseEvent(e, _kMouseEventMove), e.position,
+        final canvasPosition = _pointerPositionForRemoteCanvas(e);
+        handleMouse(_getMouseEvent(e, _kMouseEventMove), canvasPosition,
             edgeScroll: useEdgeScroll);
       }
     }
@@ -1495,6 +1500,16 @@ class InputModel {
     return false;
   }
 
+  /// iOS may emit a synthesized touch event after a real mouse click.
+  /// This helper ignores touch-down events that arrive shortly after a mouse down,
+  /// even when the position is far (e.g., near the top edge).
+  bool _shouldIgnoreTouchAfterMouse(int nowMs) {
+    if (!isIOS) return false;
+    const int kTouchAfterMouseWindowMs = 700;
+    final dt = nowMs - _lastMouseDownTimeMs;
+    return dt >= 0 && dt < kTouchAfterMouseWindowMs;
+  }
+
   void onPointDownImage(PointerDownEvent e) {
     debugPrint("onPointDownImage ${e.kind}");
     _stopFling = true;
@@ -1507,6 +1522,9 @@ class InputModel {
     // Track mouse down events for duplicate detection on iOS.
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (e.kind == ui.PointerDeviceKind.mouse) {
+      if (!isPhysicalMouse.value) {
+        isPhysicalMouse.value = true;
+      }
       _lastMouseDownTimeMs = nowMs;
       _lastMouseDownPos = e.position;
     }
@@ -1516,6 +1534,10 @@ class InputModel {
     }
 
     if (e.kind != ui.PointerDeviceKind.mouse) {
+      // Ignore duplicate touch events that follow a recent mouse click (iOS Magic Mouse issue).
+      if (isPhysicalMouse.value && _shouldIgnoreTouchAfterMouse(nowMs)) {
+        return;
+      }
       if (isPhysicalMouse.value) {
         isPhysicalMouse.value = false;
       }
@@ -1527,7 +1549,8 @@ class InputModel {
         _relativeMouse
             .sendRelativeMouseButton(_getMouseEvent(e, _kMouseEventDown));
       } else {
-        handleMouse(_getMouseEvent(e, _kMouseEventDown), e.position);
+        final canvasPosition = _pointerPositionForRemoteCanvas(e);
+        handleMouse(_getMouseEvent(e, _kMouseEventDown), canvasPosition);
       }
     }
   }
@@ -1549,7 +1572,8 @@ class InputModel {
         _relativeMouse
             .sendRelativeMouseButton(_getMouseEvent(e, _kMouseEventUp));
       } else {
-        handleMouse(_getMouseEvent(e, _kMouseEventUp), e.position);
+        final canvasPosition = _pointerPositionForRemoteCanvas(e);
+        handleMouse(_getMouseEvent(e, _kMouseEventUp), canvasPosition);
       }
     }
   }
@@ -1571,10 +1595,38 @@ class InputModel {
     }
     if (isPhysicalMouse.value) {
       if (!_relativeMouse.handleRelativeMouseMove(e.localPosition)) {
-        handleMouse(_getMouseEvent(e, _kMouseEventMove), e.position,
+        final canvasPosition = _pointerPositionForRemoteCanvas(e);
+        handleMouse(_getMouseEvent(e, _kMouseEventMove), canvasPosition,
             edgeScroll: useEdgeScroll);
       }
     }
+  }
+
+  /// Convert pointer coordinates into the visible remote canvas space.
+  ///
+  /// On mobile, the remote page body is wrapped in `SafeArea`, but the pointer
+  /// listener that feeds these events sits outside that subtree. As a result,
+  /// `event.localPosition` still includes the top/left safe-area inset.
+  ///
+  /// When the keyboard-visible path shows `KeyHelpTools`, the remote canvas is
+  /// also shifted downward by `CanvasModel.getAdjustY()`. The downstream mouse
+  /// mapping logic expects coordinates relative to the visible canvas area, so
+  /// we subtract both the mobile safe-area padding and the current canvas
+  /// adjustment before passing the position into mouse mapping.
+  ///
+  /// Desktop and web desktop continue to use the global position directly
+  /// because their pointer mapping is window-based.
+  Offset _pointerPositionForRemoteCanvas(PointerEvent event) {
+    if (isDesktop || isWebDesktop) {
+      return event.position;
+    }
+    final mediaData = MediaQueryData.fromView(
+        WidgetsBinding.instance.platformDispatcher.views.first);
+    final adjustY = parent.target?.canvasModel.getAdjustY() ?? 0.0;
+    return Offset(
+      event.localPosition.dx - mediaData.padding.left,
+      event.localPosition.dy - mediaData.padding.top - adjustY,
+    );
   }
 
   static Future<Rect?> fillRemoteCoordsAndGetCurFrame(
@@ -1735,6 +1787,11 @@ class InputModel {
   }
 
   bool _checkPeerControlProtected(double x, double y) {
+    if (isViewOnly && showMyCursor) {
+      lastMousePos = ui.Offset(x, y);
+      return false;
+    }
+
     final cursorModel = parent.target!.cursorModel;
     if (cursorModel.isPeerControlProtected) {
       lastMousePos = ui.Offset(x, y);
