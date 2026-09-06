@@ -2973,6 +2973,40 @@ class ServerConfig {
         key = options['key'] ?? "";
 }
 
+Future<ServerConfig> discoverMirvDeskServer(String input) async {
+  var base = input.trim();
+  if (base.isEmpty) {
+    throw 'MirvDesk Server address is empty';
+  }
+  if (!base.startsWith('http://') && !base.startsWith('https://')) {
+    base = 'https://$base';
+  }
+  base = base.replaceFirst(RegExp(r'/+$'), '');
+  final baseUri = Uri.tryParse(base);
+  if (baseUri == null || baseUri.host.isEmpty) {
+    throw 'Invalid MirvDesk Server address';
+  }
+  final uri = Uri.parse('$base/.well-known/mirvdesk');
+  final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+  if (resp.statusCode != 200) {
+    throw 'Discovery failed: HTTP ${resp.statusCode}';
+  }
+  final data = jsonDecode(decode_http_response(resp));
+  if (data is! Map<String, dynamic> || data['schema'] != 1) {
+    throw 'Unsupported MirvDesk discovery response';
+  }
+  final config = ServerConfig(
+    idServer: (data['id_server'] ?? '').toString(),
+    relayServer: (data['relay_server'] ?? '').toString(),
+    apiServer: (data['api_server'] ?? '').toString(),
+    key: (data['key'] ?? '').toString(),
+  );
+  if (config.idServer.isEmpty || config.apiServer.isEmpty || config.key.isEmpty) {
+    throw 'Incomplete MirvDesk discovery response';
+  }
+  return config;
+}
+
 Widget dialogButton(String text,
     {required VoidCallback? onPressed,
     bool isOutline = false,

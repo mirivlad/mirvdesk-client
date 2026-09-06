@@ -70,11 +70,13 @@ void showServerSettingsWithValue(
     OverlayDialogManager dialogManager,
     void Function(VoidCallback)? upSetState) async {
   var isInProgress = false;
+  final discoveryCtrl = TextEditingController(text: serverConfig.apiServer);
   final idCtrl = TextEditingController(text: serverConfig.idServer);
   final relayCtrl = TextEditingController(text: serverConfig.relayServer);
   final apiCtrl = TextEditingController(text: serverConfig.apiServer);
   final keyCtrl = TextEditingController(text: serverConfig.key);
 
+  RxString discoveryMsg = ''.obs;
   RxString idServerMsg = ''.obs;
   RxString relayServerMsg = ''.obs;
   RxString apiServerMsg = ''.obs;
@@ -87,6 +89,26 @@ void showServerSettingsWithValue(
   ];
 
   dialogManager.show((setState, close, context) {
+    Future<void> discover() async {
+      setState(() {
+        isInProgress = true;
+      });
+      discoveryMsg.value = '';
+      try {
+        final config = await discoverMirvDeskServer(discoveryCtrl.text);
+        idCtrl.text = config.idServer;
+        relayCtrl.text = config.relayServer;
+        apiCtrl.text = config.apiServer;
+        keyCtrl.text = config.key;
+      } catch (e) {
+        discoveryMsg.value = e.toString();
+      } finally {
+        setState(() {
+          isInProgress = false;
+        });
+      }
+    }
+
     Future<bool> submit() async {
       setState(() {
         isInProgress = true;
@@ -153,8 +175,16 @@ void showServerSettingsWithValue(
           child: Obx(() => Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  buildField(translate('ID Server'), idCtrl, idServerMsg.value,
+                  buildField('MirvDesk Server', discoveryCtrl, discoveryMsg.value,
                       autofocus: true),
+                  SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: dialogButton('Discover',
+                        onPressed: isInProgress ? null : discover),
+                  ),
+                  SizedBox(height: 12),
+                  buildField(translate('ID Server'), idCtrl, idServerMsg.value),
                   SizedBox(height: 8),
                   if (!isIOS && !isWeb) ...[
                     buildField(translate('Relay Server'), relayCtrl,

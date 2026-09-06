@@ -122,6 +122,12 @@ impl Drop for SimpleCallOnReturn {
 }
 
 pub fn global_init() -> bool {
+    {
+        let mut server = config::PROD_RENDEZVOUS_SERVER.write().unwrap();
+        if server.is_empty() {
+            *server = "mirvdesk.invalid".to_owned();
+        }
+    }
     #[cfg(all(target_os = "linux", feature = "drm"))]
     crate::platform::linux::dispatch_wayland_display_probe();
     #[cfg(target_os = "linux")]
