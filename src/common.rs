@@ -125,6 +125,7 @@ fn discover_default_mirvdesk_server() {
     const DEFAULT_SERVER_URL: &str = env!("MIRVDESK_DEFAULT_SERVER_URL");
     const BOOTSTRAP_URL_OPTION: &str = "mirvdesk-bootstrap-url";
     const BOOTSTRAP_ID_OPTION: &str = "mirvdesk-bootstrap-id";
+    const API_AUTH_ONLY_OPTION: &str = "mirvdesk-api-auth-only";
 
     let base = DEFAULT_SERVER_URL.trim().trim_end_matches('/');
     if base.is_empty() {
@@ -135,10 +136,19 @@ fn discover_default_mirvdesk_server() {
     let previous_url = Config::get_option(BOOTSTRAP_URL_OPTION);
     let previous_id = Config::get_option(BOOTSTRAP_ID_OPTION);
     let first_setup = current_id.is_empty();
-    let default_url_changed = !previous_url.is_empty()
-        && previous_url != base
-        && !previous_id.is_empty()
-        && current_id == previous_id;
+    let auto_managed =
+        !previous_url.is_empty() && !previous_id.is_empty() && current_id == previous_id;
+    if auto_managed {
+        let mut options = Config::get_options();
+        if options.get(API_AUTH_ONLY_OPTION).map(String::as_str) != Some("Y") {
+            options.insert(API_AUTH_ONLY_OPTION.to_owned(), "Y".to_owned());
+            Config::set_options(options);
+        }
+        if LocalConfig::get_option("disable-group-panel") != "Y" {
+            LocalConfig::set_option("disable-group-panel".to_owned(), "Y".to_owned());
+        }
+    }
+    let default_url_changed = auto_managed && previous_url != base;
     if !first_setup && !default_url_changed {
         return;
     }
@@ -175,7 +185,9 @@ fn discover_default_mirvdesk_server() {
         options.insert("key".to_owned(), key);
         options.insert(BOOTSTRAP_URL_OPTION.to_owned(), base.to_owned());
         options.insert(BOOTSTRAP_ID_OPTION.to_owned(), id_server);
+        options.insert(API_AUTH_ONLY_OPTION.to_owned(), "Y".to_owned());
         Config::set_options(options);
+        LocalConfig::set_option("disable-group-panel".to_owned(), "Y".to_owned());
         Ok(())
     })();
 

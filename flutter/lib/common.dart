@@ -2923,13 +2923,19 @@ class ServerConfig {
   late String relayServer;
   late String apiServer;
   late String key;
+  late bool mirvdesk;
 
   ServerConfig(
-      {String? idServer, String? relayServer, String? apiServer, String? key}) {
+      {String? idServer,
+      String? relayServer,
+      String? apiServer,
+      String? key,
+      bool mirvdesk = false}) {
     this.idServer = idServer?.trim() ?? '';
     this.relayServer = relayServer?.trim() ?? '';
     this.apiServer = apiServer?.trim() ?? '';
     this.key = key?.trim() ?? '';
+    this.mirvdesk = mirvdesk;
   }
 
   /// decode from shared string (from user shared or rustdesk-server generated)
@@ -2949,6 +2955,7 @@ class ServerConfig {
     relayServer = json['relay'] ?? '';
     apiServer = json['api'] ?? '';
     key = json['key'] ?? '';
+    mirvdesk = false;
   }
 
   /// encode to shared string
@@ -2970,7 +2977,8 @@ class ServerConfig {
       : idServer = options['custom-rendezvous-server'] ?? "",
         relayServer = options['relay-server'] ?? "",
         apiServer = options['api-server'] ?? "",
-        key = options['key'] ?? "";
+        key = options['key'] ?? "",
+        mirvdesk = options['mirvdesk-api-auth-only'] == 'Y';
 }
 
 Future<ServerConfig> discoverMirvDeskServer(String input) async {
@@ -3000,6 +3008,7 @@ Future<ServerConfig> discoverMirvDeskServer(String input) async {
     relayServer: (data['relay_server'] ?? '').toString(),
     apiServer: (data['api_server'] ?? '').toString(),
     key: (data['key'] ?? '').toString(),
+    mirvdesk: true,
   );
   if (config.idServer.isEmpty || config.apiServer.isEmpty || config.key.isEmpty) {
     throw 'Incomplete MirvDesk discovery response';
@@ -3667,6 +3676,11 @@ Future<bool> setServerConfig(
   await bind.mainSetOption(key: 'relay-server', value: config.relayServer);
   await bind.mainSetOption(key: 'api-server', value: config.apiServer);
   await bind.mainSetOption(key: 'key', value: config.key);
+  await bind.mainSetOption(
+      key: 'mirvdesk-api-auth-only', value: config.mirvdesk ? 'Y' : '');
+  if (config.mirvdesk) {
+    await bind.mainSetLocalOption(key: 'disable-group-panel', value: 'Y');
+  }
   final newApiServer = await bind.mainGetApiServer();
   if (oldApiServer.isNotEmpty &&
       oldApiServer != newApiServer &&
