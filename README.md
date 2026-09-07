@@ -1,3 +1,24 @@
+<!-- MIRVDESK-INTRO -->
+# MirvDesk Client
+
+MirvDesk Client is an independent downstream client based on RustDesk and designed to work with [MirvDesk Server](https://github.com/mirivlad/mirvdesk-server). It stays close to upstream RustDesk while adding MirvDesk account/address-book integration and server discovery. MirvDesk is not affiliated with or endorsed by RustDesk/Purslane.
+
+## Zero-config releases for self-hosters
+
+A fork maintainer configures one bootstrap URL in [`mirvdesk.conf`](mirvdesk.conf):
+
+```text
+server_url=https://desk.example.com
+```
+
+CI workflows do not need to be edited. Release binaries embed only this bootstrap URL. On first launch, if the client has no manually configured ID server, it requests `/.well-known/mirvdesk` and stores the returned ID server, relay server, API URL, and public key. After that, users can immediately connect by ID or sign in to the MirvDesk address book without entering server settings.
+
+If a later release changes `server_url`, clients still using the previously auto-discovered server migrate to the new default automatically. Manually configured server settings are not overwritten. Leaving `server_url=` empty produces a generic unconfigured MirvDesk build.
+
+---
+
+## Upstream RustDesk README
+
 <p align="center">
   <img src="res/logo-header.svg" alt="RustDesk - Your remote desktop"><br>
   <a href="#raw-steps-to-build">Build</a> •

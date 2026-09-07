@@ -121,7 +121,72 @@ impl Drop for SimpleCallOnReturn {
     }
 }
 
+fn discover_default_mirvdesk_server() {
+    const DEFAULT_SERVER_URL: &str = env!("MIRVDESK_DEFAULT_SERVER_URL");
+    const BOOTSTRAP_URL_OPTION: &str = "mirvdesk-bootstrap-url";
+    const BOOTSTRAP_ID_OPTION: &str = "mirvdesk-bootstrap-id";
+
+    let base = DEFAULT_SERVER_URL.trim().trim_end_matches('/');
+    if base.is_empty() {
+        return;
+    }
+
+    let current_id = Config::get_option("custom-rendezvous-server");
+    let previous_url = Config::get_option(BOOTSTRAP_URL_OPTION);
+    let previous_id = Config::get_option(BOOTSTRAP_ID_OPTION);
+    let first_setup = current_id.is_empty();
+    let default_url_changed = !previous_url.is_empty()
+        && previous_url != base
+        && !previous_id.is_empty()
+        && current_id == previous_id;
+    if !first_setup && !default_url_changed {
+        return;
+    }
+
+    let result = (|| -> ResultType<()> {
+        let client = reqwest::blocking::Client::builder()
+            .connect_timeout(Duration::from_secs(2))
+            .timeout(Duration::from_secs(4))
+            .build()?;
+        let url = format!("{base}/.well-known/mirvdesk");
+        let data: serde_json::Value = client.get(url).send()?.error_for_status()?.json()?;
+        if data.get("schema").and_then(|v| v.as_i64()) != Some(1) {
+            bail!("unsupported MirvDesk discovery schema");
+        }
+        let value = |key: &str| {
+            data.get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .trim()
+                .to_owned()
+        };
+        let id_server = value("id_server");
+        let relay_server = value("relay_server");
+        let api_server = value("api_server").trim_end_matches('/').to_owned();
+        let key = value("key");
+        if id_server.is_empty() || api_server.is_empty() || key.is_empty() {
+            bail!("incomplete MirvDesk discovery response");
+        }
+
+        let mut options = Config::get_options();
+        options.insert("custom-rendezvous-server".to_owned(), id_server.clone());
+        options.insert("relay-server".to_owned(), relay_server);
+        options.insert("api-server".to_owned(), api_server);
+        options.insert("key".to_owned(), key);
+        options.insert(BOOTSTRAP_URL_OPTION.to_owned(), base.to_owned());
+        options.insert(BOOTSTRAP_ID_OPTION.to_owned(), id_server);
+        Config::set_options(options);
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => log::info!("Configured MirvDesk from default server {}", base),
+        Err(err) => log::warn!("Default MirvDesk discovery failed for {}: {}", base, err),
+    }
+}
+
 pub fn global_init() -> bool {
+    discover_default_mirvdesk_server();
     {
         let mut server = config::PROD_RENDEZVOUS_SERVER.write().unwrap();
         if server.is_empty() {

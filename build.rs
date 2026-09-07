@@ -85,8 +85,23 @@ fn install_android_deps() {
     println!("cargo:rustc-link-lib=OpenSLES");
 }
 
+fn configure_mirvdesk_default_server() {
+    const PATH: &str = "mirvdesk.conf";
+    let content = std::fs::read_to_string(PATH).unwrap_or_default();
+    let url = content
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .find_map(|line| line.strip_prefix("server_url="))
+        .map(str::trim)
+        .unwrap_or("");
+    println!("cargo:rustc-env=MIRVDESK_DEFAULT_SERVER_URL={}", url);
+    println!("cargo:rerun-if-changed={}", PATH);
+}
+
 fn main() {
     hbb_common::gen_version();
+    configure_mirvdesk_default_server();
     install_android_deps();
     #[cfg(all(windows, feature = "inline"))]
     build_manifest();
