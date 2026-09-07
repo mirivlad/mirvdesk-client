@@ -823,6 +823,11 @@ impl Client {
 
         let switch_code = interface.get_switch_code();
         if !key.is_empty() && (!token.is_empty() || !switch_code.is_empty()) {
+            log::debug!(
+                "rendezvous secure TCP requested: token_present={}, switch_code_present={}",
+                !token.is_empty(),
+                !switch_code.is_empty()
+            );
             secure_tcp(&mut socket, &key)
                 .await
                 .map_err(|e| anyhow!("Failed to secure tcp: {}", e))?;

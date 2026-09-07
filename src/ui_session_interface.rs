@@ -1939,6 +1939,23 @@ impl<T: InvokeUiSession> Session<T> {
     }
 }
 
+fn is_mirvdesk_api_auth_only(options: &HashMap<String, String>) -> bool {
+    if options.get("mirvdesk-api-auth-only").map(String::as_str) == Some("Y") {
+        return true;
+    }
+
+    let default_api = env!("MIRVDESK_DEFAULT_SERVER_URL")
+        .trim()
+        .trim_end_matches('/');
+    if default_api.is_empty() {
+        return false;
+    }
+    options
+        .get("api-server")
+        .map(|api| api.trim().trim_end_matches('/') == default_api)
+        .unwrap_or(false)
+}
+
 #[tokio::main(flavor = "current_thread")]
 pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
     #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -1946,7 +1963,10 @@ pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let (sender, mut receiver) = mpsc::unbounded_channel::<Data>();
     *handler.sender.write().unwrap() = Some(sender.clone());
-    let token = if Config::get_option("mirvdesk-api-auth-only") == "Y" {
+    let network_options = crate::ipc::get_options_async().await;
+    let api_auth_only = is_mirvdesk_api_auth_only(&network_options);
+    let token = if api_auth_only {
+        log::debug!("MirvDesk API-only auth: omitting account token from rendezvous request");
         String::new()
     } else {
         LocalConfig::get_option("access_token")
@@ -2077,4 +2097,25 @@ async fn start_one_port_forward<T: InvokeUiSession>(
 async fn send_note(url: String, id: String, sid: u64, note: String) {
     let body = serde_json::json!({ "id": id, "session_id": sid, "note": note });
     allow_err!(crate::post_request(url, body.to_string(), "").await);
+}
+
+#[cfg(test)]
+mod mirvdesk_auth_tests {
+    use super::is_mirvdesk_api_auth_only;
+    use std::collections::HashMap;
+
+    #[test]
+    fn explicit_mirvdesk_marker_enables_api_only_auth() {
+        let options = HashMap::from([("mirvdesk-api-auth-only".to_owned(), "Y".to_owned())]);
+        assert!(is_mirvdesk_api_auth_only(&options));
+    }
+
+    #[test]
+    fn unrelated_server_without_marker_is_not_api_only() {
+        let options = HashMap::from([(
+            "api-server".to_owned(),
+            "https://unrelated.invalid".to_owned(),
+        )]);
+        assert!(!is_mirvdesk_api_auth_only(&options));
+    }
 }
