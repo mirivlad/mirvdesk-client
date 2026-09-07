@@ -86,17 +86,24 @@ fn install_android_deps() {
 }
 
 fn configure_mirvdesk_default_server() {
-    const PATH: &str = "mirvdesk.conf";
-    let content = std::fs::read_to_string(PATH).unwrap_or_default();
-    let url = content
+    const LOCAL_PATH: &str = "mirvdesk.local.conf";
+    let from_env = std::env::var("MIRVDESK_SERVER_URL").unwrap_or_default();
+    let local = std::fs::read_to_string(LOCAL_PATH).unwrap_or_default();
+    let from_file = local
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .find_map(|line| line.strip_prefix("server_url="))
         .map(str::trim)
         .unwrap_or("");
+    let url = if from_env.trim().is_empty() {
+        from_file
+    } else {
+        from_env.trim()
+    };
     println!("cargo:rustc-env=MIRVDESK_DEFAULT_SERVER_URL={}", url);
-    println!("cargo:rerun-if-changed={}", PATH);
+    println!("cargo:rerun-if-env-changed=MIRVDESK_SERVER_URL");
+    println!("cargo:rerun-if-changed={}", LOCAL_PATH);
 }
 
 fn main() {

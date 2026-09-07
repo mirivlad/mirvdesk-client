@@ -5,15 +5,13 @@ MirvDesk Client is an independent downstream client based on RustDesk and design
 
 ## Zero-config releases for self-hosters
 
-A fork maintainer configures one bootstrap URL in [`mirvdesk.conf`](mirvdesk.conf):
+A fork maintainer sets one GitHub Actions repository variable, `MIRVDESK_SERVER_URL`, for example `https://desk.example.com`. No workflow files or tracked source files need to be edited. Release binaries embed only this bootstrap URL.
 
-```text
-server_url=https://desk.example.com
-```
+For local builds, copy [`mirvdesk.conf.example`](mirvdesk.conf.example) to `mirvdesk.local.conf` and set the same `server_url`; the local file is gitignored.
 
-CI workflows do not need to be edited. Release binaries embed only this bootstrap URL. On first launch, if the client has no manually configured ID server, it requests `/.well-known/mirvdesk` and stores the returned ID server, relay server, API URL, and public key. After that, users can immediately connect by ID or sign in to the MirvDesk address book without entering server settings.
+On first launch, if the client has no manually configured ID server, it requests `/.well-known/mirvdesk` and stores the returned ID server, relay server, API URL, and public key. After that, users can immediately connect by ID or sign in to the MirvDesk address book without entering server settings.
 
-If a later release changes `server_url`, clients still using the previously auto-discovered server migrate to the new default automatically. Manually configured server settings are not overwritten. Leaving `server_url=` empty produces a generic unconfigured MirvDesk build.
+If a later release changes the repository variable, clients still using the previously auto-discovered server migrate to the new default automatically. Manually configured server settings are not overwritten. Leaving the variable unset produces a generic unconfigured MirvDesk build.
 
 ---
 

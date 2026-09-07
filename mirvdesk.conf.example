@@ -1,0 +1,5 @@
+# Optional MirvDesk Server configuration for local builds.
+# Copy this file to mirvdesk.local.conf; the local file is gitignored.
+# GitHub release builds use the MIRVDESK_SERVER_URL repository variable instead.
+# Example: server_url=https://desk.example.com
+server_url=
