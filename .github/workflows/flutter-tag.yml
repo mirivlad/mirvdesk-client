@@ -1,7 +1,6 @@
 name: MirvDesk Tag Build
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -9,10 +8,34 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+-[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
 
+permissions:
+  contents: write
+
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create MirvDesk release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: MirvDesk ${{ github.ref_name }}
+          prerelease: false
+          generate_release_notes: false
+          body: |
+            First public MirvDesk release, based on the RustDesk 1.5.0 client.
+
+            MirvDesk is branded and isolated from an installed RustDesk client: it uses its own application identity, configuration/state paths, services, URI scheme and packaging names, so both clients can coexist on the same machine.
+
+            This release is intended for self-hosted MirvDesk Server deployments. Personal Address Book remains available; the upstream Accessible devices / Groups panel is hidden until the MirvDesk server implements that API. Stock RustDesk auto-update is disabled in MirvDesk for the same reason: updates must not replace MirvDesk with an upstream RustDesk build.
+
+            Packages are built by GitHub Actions for Windows, Linux, macOS and Android.
+
   run-flutter-tag-build:
+    needs: prepare-release
     uses: ./.github/workflows/flutter-build.yml
     secrets: inherit
     with:
       upload-artifact: true
       upload-tag: ${{ github.ref_name }}
+      prerelease: false

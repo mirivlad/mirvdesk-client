@@ -12,6 +12,9 @@ on:
       smoke:
         type: boolean
         default: false
+      prerelease:
+        type: boolean
+        default: true
 
 # NOTE: F-Droid builder script 'flutter/build_fdroid.sh' reads environment
 # variables from this workflow!
@@ -76,16 +79,16 @@ jobs:
       - name: Generate SBOM
         run: |
           syft dir:. \
-            -o cyclonedx-json=rustdesk.sbom.json
+            -o cyclonedx-json=mirvdesk.sbom.json
 
       - name: Publish Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
-            rustdesk.sbom.json
+            mirvdesk.sbom.json
 
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
@@ -429,7 +432,7 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             ./SignOutput/mirvdesk-*.msi
@@ -583,7 +586,7 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             ./SignOutput/mirvdesk-*.exe
@@ -704,7 +707,7 @@ jobs:
       #   # if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
       #   uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       #   with:
-      #     prerelease: true
+      #     prerelease: ${{ inputs.prerelease }}
       #     tag_name: ${{ env.TAG_NAME }}
       #     files: |
       #       flutter/build/ios/ipa/*.ipa
@@ -926,7 +929,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             mirvdesk*-${{ matrix.job.arch }}.dmg
@@ -988,7 +991,7 @@ jobs:
       - name: Publish unsigned app
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: mirvdesk-${{ env.VERSION }}-unsigned.tar.gz
 
@@ -1272,7 +1275,7 @@ jobs:
         if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
@@ -1281,7 +1284,7 @@ jobs:
         if: env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             signed-apk/mirvdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.apk
@@ -1457,7 +1460,7 @@ jobs:
         if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
@@ -1466,7 +1469,7 @@ jobs:
         if: env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             signed-apk/mirvdesk-${{ env.VERSION }}-universal${{ env.suffix }}.apk
@@ -1764,7 +1767,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: mirvdesk-*.deb
 
@@ -1772,7 +1775,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true' && !inputs.smoke
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: mirvdesk-*.rpm
 
@@ -1806,7 +1809,7 @@ jobs:
         if: matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true' && !inputs.smoke
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             res/mirvdesk-${{ env.VERSION }}*.zst
@@ -2067,7 +2070,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             ${{ env.DRM_DEB }}
@@ -2310,7 +2313,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             mirvdesk-${{ env.VERSION }}-${{ matrix.job.arch }}-sciter.deb
@@ -2368,7 +2371,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             ./appimage/mirvdesk-${{ env.VERSION }}-*.AppImage
@@ -2453,7 +2456,7 @@ jobs:
       - name: Publish flatpak package
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             flatpak/mirvdesk-${{ env.VERSION }}-${{ matrix.job.arch }}${{ matrix.job.suffix }}.flatpak
@@ -2537,7 +2540,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
           tag_name: ${{ env.TAG_NAME }}
           files: |
             flutter/build/rustdesk-${{ env.VERSION }}-${{ env.RELEASE_NAME }}.tar.gz
