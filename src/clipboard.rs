@@ -127,7 +127,7 @@ pub fn is_file_url_set_by_rustdesk(url: &Vec<String>) -> bool {
     url.iter()
         .next()
         .map(|s| {
-            for prefix in &["file:///tmp/.rustdesk_", "//tmp/.rustdesk_"] {
+            for prefix in &["file:///tmp/.mirvdesk_", "//tmp/.mirvdesk_"] {
                 if s.starts_with(prefix) {
                     return s[prefix.len()..].parse::<uuid::Uuid>().is_ok();
                 }
