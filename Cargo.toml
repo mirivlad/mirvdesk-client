@@ -5,6 +5,8 @@ authors = ["RustDesk contributors", "MirvDesk contributors"]
 edition = "2021"
 build= "build.rs"
 description = "MirvDesk Remote Desktop"
+repository = "https://github.com/mirivlad/mirvdesk-client"
+homepage = "https://github.com/mirivlad/mirvdesk-client"
 default-run = "rustdesk"
 rust-version = "1.75"
 
