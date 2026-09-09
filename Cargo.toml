@@ -8,6 +8,7 @@ description = "MirvDesk Remote Desktop"
 repository = "https://github.com/mirivlad/mirvdesk-client"
 homepage = "https://github.com/mirivlad/mirvdesk-client"
 license = "AGPL-3.0"
+publish = false
 default-run = "rustdesk"
 rust-version = "1.75"
 
