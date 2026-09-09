@@ -4,7 +4,7 @@ version = "1.5.0"
 authors = ["rustdesk <info@rustdesk.com>"]
 edition = "2021"
 build= "build.rs"
-description = "RustDesk Remote Desktop"
+description = "MirvDesk Remote Desktop"
 default-run = "rustdesk"
 rust-version = "1.75"
 
@@ -233,10 +233,10 @@ webrtc-util = { git = "https://github.com/rustdesk-org/webrtc", rev = "b221f13b1
 webrtc-sctp = { git = "https://github.com/rustdesk-org/webrtc", rev = "b221f13b1d6f21fbce09f9f63096be27dd392265" }
 
 [package.metadata.winres]
-LegalCopyright = "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved."
-ProductName = "RustDesk"
-FileDescription = "RustDesk Remote Desktop"
-OriginalFilename = "rustdesk.exe"
+LegalCopyright = "Copyright © RustDesk contributors and MirvDesk contributors."
+ProductName = "MirvDesk"
+FileDescription = "MirvDesk Remote Desktop"
+OriginalFilename = "MirvDesk.exe"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "0.1"
@@ -253,8 +253,8 @@ docopt = "1.1"
 tokio = { version = "1.44", features = ["test-util"] }
 
 [package.metadata.bundle]
-name = "RustDesk"
-identifier = "com.carriez.rustdesk"
+name = "MirvDesk"
+identifier = "top.mirv.mirvdesk"
 icon = ["res/32x32.png", "res/128x128.png", "res/128x128@2x.png"]
 osx_minimum_system_version = "10.14"
 

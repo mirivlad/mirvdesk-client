@@ -1,4 +1,4 @@
-name: Flutter Nightly Build
+name: MirvDesk Nightly Build
 
 on:
   schedule:

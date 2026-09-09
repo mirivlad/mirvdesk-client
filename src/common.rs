@@ -197,7 +197,19 @@ fn discover_default_mirvdesk_server() {
     }
 }
 
+pub const MIRVDESK_APP_NAME: &str = "MirvDesk";
+
+/// Select the fork identity before any configuration, IPC or log path is resolved.
+/// hbb_common derives those paths from APP_NAME.
+pub fn init_mirvdesk_branding() {
+    let mut app_name = config::APP_NAME.write().unwrap();
+    if app_name.as_str() != MIRVDESK_APP_NAME {
+        *app_name = MIRVDESK_APP_NAME.to_owned();
+    }
+}
+
 pub fn global_init() -> bool {
+    init_mirvdesk_branding();
     discover_default_mirvdesk_server();
     {
         let mut server = config::PROD_RENDEZVOUS_SERVER.write().unwrap();

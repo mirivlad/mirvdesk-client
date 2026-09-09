@@ -357,16 +357,16 @@ def generate_control_file(version):
     control_file_path = "../res/DEBIAN/control"
     system2('/bin/rm -rf %s' % control_file_path)
 
-    content = """Package: rustdesk
+    content = """Package: mirvdesk
 Section: net
 Priority: optional
 Version: %s
 Architecture: %s
-Maintainer: rustdesk <info@rustdesk.com>
-Homepage: https://rustdesk.com
+Maintainer: MirvDesk Project
+Homepage: https://github.com/mirivlad/mirvdesk-client
 Depends: libgtk-3-0t64 | libgtk-3-0, libxcb-randr0, libxdo3 | libxdo4, libxfixes3, libxcb-shape0, libxcb-xfixes0, libasound2t64 | libasound2, libsystemd0, curl, libva2, libva-drm2, libva-x11-2, libgstreamer-plugins-base1.0-0, gstreamer1.0-pipewire%s
 Recommends: libayatana-appindicator3-1
-Description: A remote control software.
+Description: MirvDesk self-hosted remote desktop client based on RustDesk.
 
 """ % (version, get_deb_arch(), get_deb_extra_depends())
     file = open(control_file_path, "w")
@@ -566,7 +566,7 @@ def _assert_so_has_egl(so_path):
             'libgles2-mesa-dev; Arch: mesa libglvnd).')
 
 
-DRM_PACKAGE_NAME = 'rustdesk-unattended-wayland'
+DRM_PACKAGE_NAME = 'mirvdesk-unattended-wayland'
 
 
 def assert_so_satisfies_the_runtime_abi_gate(so_path):
@@ -620,18 +620,18 @@ def assert_so_satisfies_the_runtime_abi_gate(so_path):
 
 def stage_libdrmtap_into_deb(so_path):
     # Put the built libdrmtap object plus its soname symlink into the staged deb. Only the soname
-    # symlink is needed: libdrmtap is resolved by ABSOLUTE path (/usr/lib/rustdesk/libdrmtap.so.0) at
-    # the in-process dlopen site (drmtap_dl.rs), so the deb does NOT drop /usr/lib/rustdesk into the
+    # symlink is needed: libdrmtap is resolved by ABSOLUTE path (/usr/lib/mirvdesk/libdrmtap.so.0) at
+    # the in-process dlopen site (drmtap_dl.rs), so the deb does NOT drop /usr/lib/mirvdesk into the
     # system-wide /etc/ld.so.conf.d search path, which would let this private library shadow a system
     # library for every binary on the host (Debian Policy 10.2 forbids that). No ld.so.conf.d drop-in
     # and no ldconfig trigger are shipped, so the stock postinst is used unchanged.
     assert_so_satisfies_the_runtime_abi_gate(so_path)
     so_basename = os.path.basename(so_path)
-    system2('mkdir -p tmpdeb/usr/lib/rustdesk')
+    system2('mkdir -p tmpdeb/usr/lib/mirvdesk')
     # Quoted: so_path comes from the repo root or from DRMTAP_PREBUILT_DIR, either of which can
     # contain a space, and an unquoted interpolation would split the argument and fail obscurely.
-    system2(f'cp "{so_path}" tmpdeb/usr/lib/rustdesk/')
-    system2(f'ln -sf "{so_basename}" tmpdeb/usr/lib/rustdesk/libdrmtap.so.0')
+    system2(f'cp "{so_path}" tmpdeb/usr/lib/mirvdesk/')
+    system2(f'ln -sf "{so_basename}" tmpdeb/usr/lib/mirvdesk/libdrmtap.so.0')
 
 
 def _max_glibc_minor(path):
@@ -652,9 +652,9 @@ def _max_glibc_minor(path):
 def measured_glibc_floor():
     # libdrmtap is built on a newer base than the rest of the deb, so the floor is whichever staged
     # object is higher -- and it moves whenever either base does.
-    paths = [p for p in glob.glob('tmpdeb/usr/lib/rustdesk/libdrmtap.so.0.*')
-             + glob.glob('tmpdeb/usr/share/rustdesk/lib/librustdesk.so')
-             + glob.glob('tmpdeb/usr/share/rustdesk/rustdesk')
+    paths = [p for p in glob.glob('tmpdeb/usr/lib/mirvdesk/libdrmtap.so.0.*')
+             + glob.glob('tmpdeb/usr/share/mirvdesk/lib/librustdesk.so')
+             + glob.glob('tmpdeb/usr/share/mirvdesk/mirvdesk')
              if os.path.isfile(p) and not os.path.islink(p)]
     minor = max((_max_glibc_minor(p) for p in paths), default=0)
     if not minor:
@@ -678,9 +678,9 @@ def retarget_control_to_drm_variant():
         lines = f.readlines()
     out = []
     for line in lines:
-        if line.startswith('Package: rustdesk'):
+        if line.startswith('Package: mirvdesk'):
             out.append(f'Package: {DRM_PACKAGE_NAME}\n')
-            out.append('Conflicts: rustdesk\nReplaces: rustdesk\nProvides: rustdesk\n')
+            out.append('Conflicts: mirvdesk\nReplaces: mirvdesk\nProvides: mirvdesk\n')
         elif line.startswith('Depends:'):
             # 2.4.101 is where drmModeGetFB2 landed; below it libdrmtap loads and can never capture.
             out.append(line.rstrip('\n') + ', libdrm2 (>= 2.4.101), libegl1, libgles2, '
@@ -703,27 +703,27 @@ def build_flutter_deb(version, features):
     os.chdir('flutter')
     system2('flutter build linux --release')
     system2('mkdir -p tmpdeb/usr/bin/')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
+    system2('mkdir -p tmpdeb/usr/share/mirvdesk')
+    system2('mkdir -p tmpdeb/usr/share/mirvdesk/files/systemd/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/256x256/apps/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
     system2('mkdir -p tmpdeb/usr/share/applications/')
     system2('mkdir -p tmpdeb/usr/share/polkit-1/actions')
-    system2('rm tmpdeb/usr/bin/rustdesk || true')
+    system2('rm -f tmpdeb/usr/bin/rustdesk tmpdeb/usr/bin/mirvdesk || true')
     system2(
-        f'cp -r {flutter_build_dir}/* tmpdeb/usr/share/rustdesk/')
+        f'cp -r {flutter_build_dir}/* tmpdeb/usr/share/mirvdesk/')
     system2(
-        'cp ../res/rustdesk.service tmpdeb/usr/share/rustdesk/files/systemd/')
+        'cp ../res/rustdesk.service tmpdeb/usr/share/mirvdesk/files/systemd/mirvdesk.service')
     system2(
-        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/rustdesk.png')
+        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/mirvdesk.png')
     system2(
-        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/rustdesk.svg')
+        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/mirvdesk.svg')
     system2(
-        'cp ../res/rustdesk.desktop tmpdeb/usr/share/applications/rustdesk.desktop')
+        'cp ../res/rustdesk.desktop tmpdeb/usr/share/applications/mirvdesk.desktop')
     system2(
-        'cp ../res/rustdesk-link.desktop tmpdeb/usr/share/applications/rustdesk-link.desktop')
+        'cp ../res/rustdesk-link.desktop tmpdeb/usr/share/applications/mirvdesk-link.desktop')
     system2(
-        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/rustdesk/files/polkit && chmod a+x tmpdeb/usr/share/rustdesk/files/polkit")
+        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/mirvdesk/files/polkit && chmod a+x tmpdeb/usr/share/mirvdesk/files/polkit")
     # Bundle libdrmtap.so only when this build actually enabled the `drm` feature, so stock packages
     # stay exactly what they were. The root service dlopens it in-process by absolute path.
     # `features` is the comma-joined string, so split it: a bare substring test would also match any
@@ -742,18 +742,18 @@ def build_flutter_deb(version, features):
         retarget_control_to_drm_variant()
     system2('cp -a ../res/DEBIAN/* tmpdeb/DEBIAN/')
     md5_file_folder("tmpdeb/")
-    system2('dpkg-deb -b tmpdeb rustdesk.deb;')
+    system2('dpkg-deb -b tmpdeb mirvdesk.deb;')
 
     system2('/bin/rm -rf tmpdeb/')
     system2('/bin/rm -rf ../res/DEBIAN/control')
-    os.rename('rustdesk.deb', '../rustdesk-%s.deb' % version)
+    os.rename('mirvdesk.deb', '../mirvdesk-%s.deb' % version)
     if ships_so:
         # Named apart from the stock package so installing the consent-free variant is a deliberate act.
-        os.rename('../rustdesk-%s.deb' % version, f'../{DRM_PACKAGE_NAME}-{version}.deb')
+        os.rename('../mirvdesk-%s.deb' % version, f'../{DRM_PACKAGE_NAME}-{version}.deb')
     os.chdir("..")
 
 
-DRMTAP_DLOPEN_MARKER = b'/usr/lib/rustdesk/libdrmtap.so.0'
+DRMTAP_DLOPEN_MARKER = b'/usr/lib/mirvdesk/libdrmtap.so.0'
 # Present only when `drm-wake` is compiled in: the runtime option constant is itself
 # #[cfg(feature = "drm-wake")] (src/ipc/drm.rs). The dlopen marker above cannot stand in for it -
 # `--features drm` alone produces a binary that carries the dlopen path and NO wake code, and that
@@ -786,8 +786,8 @@ def assert_staged_binary_is_drm():
     Called from BOTH packaging paths. It used to guard only one of them, and `--skip-cargo` (which
     is how CI packages) reaches the other, where nothing had rebuilt the binary at all.
     """
-    binaries = [p for p in glob.glob('tmpdeb/usr/share/rustdesk/lib/librustdesk.so')
-                + glob.glob('tmpdeb/usr/share/rustdesk/rustdesk') if os.path.isfile(p)]
+    binaries = [p for p in glob.glob('tmpdeb/usr/share/mirvdesk/lib/librustdesk.so')
+                + glob.glob('tmpdeb/usr/share/mirvdesk/mirvdesk') if os.path.isfile(p)]
     if not any(_carries_drmtap_marker(p) for p in binaries):
         raise Exception(
             f'--drm was requested but the staged bundle does not look like a drm build (no '
@@ -811,34 +811,37 @@ def assert_staged_binary_is_drm():
 def build_deb_from_folder(version, binary_folder, want_drm=False):
     os.chdir('flutter')
     system2('mkdir -p tmpdeb/usr/bin/')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk')
-    system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
+    system2('mkdir -p tmpdeb/usr/share/mirvdesk')
+    system2('mkdir -p tmpdeb/usr/share/mirvdesk/files/systemd/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/256x256/apps/')
     system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
     system2('mkdir -p tmpdeb/usr/share/applications/')
     system2('mkdir -p tmpdeb/usr/share/polkit-1/actions')
-    system2('rm tmpdeb/usr/bin/rustdesk || true')
+    system2('rm -f tmpdeb/usr/bin/rustdesk tmpdeb/usr/bin/mirvdesk || true')
     system2(
-        f'cp -r ../{binary_folder}/* tmpdeb/usr/share/rustdesk/')
+        f'cp -r ../{binary_folder}/* tmpdeb/usr/share/mirvdesk/')
+    # Package-from-folder is also used by the Sciter build, whose Cargo binary keeps
+    # the upstream rustdesk filename. Rename only the installed product executable.
+    system2('if [ -f tmpdeb/usr/share/mirvdesk/rustdesk ]; then mv tmpdeb/usr/share/mirvdesk/rustdesk tmpdeb/usr/share/mirvdesk/mirvdesk; fi')
     system2(
-        'cp ../res/rustdesk.service tmpdeb/usr/share/rustdesk/files/systemd/')
+        'cp ../res/rustdesk.service tmpdeb/usr/share/mirvdesk/files/systemd/mirvdesk.service')
     system2(
-        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/rustdesk.png')
+        'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/mirvdesk.png')
     system2(
-        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/rustdesk.svg')
+        'cp ../res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/mirvdesk.svg')
     system2(
-        'cp ../res/rustdesk.desktop tmpdeb/usr/share/applications/rustdesk.desktop')
+        'cp ../res/rustdesk.desktop tmpdeb/usr/share/applications/mirvdesk.desktop')
     system2(
-        'cp ../res/rustdesk-link.desktop tmpdeb/usr/share/applications/rustdesk-link.desktop')
+        'cp ../res/rustdesk-link.desktop tmpdeb/usr/share/applications/mirvdesk-link.desktop')
     system2(
-        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/rustdesk/files/polkit && chmod a+x tmpdeb/usr/share/rustdesk/files/polkit")
+        "echo \"#!/bin/sh\" >> tmpdeb/usr/share/mirvdesk/files/polkit && chmod a+x tmpdeb/usr/share/mirvdesk/files/polkit")
     # Where the capture library comes from for a `--package <folder> --drm` build. Two shapes are
     # supported, because two exist in practice: a bundle that already carries libdrmtap.so.0.*
     # (someone staged it, e.g. a CI artifact), and a plain bundle, which is what every build path
     # here actually produces -- the flutter deb builds the library straight into the staged deb, so
     # nothing ever puts it inside the bundle folder. Demanding it in the bundle made this flag
     # combination impossible to satisfy.
-    bundled_glob = glob.glob('tmpdeb/usr/share/rustdesk/libdrmtap.so.0.*')
+    bundled_glob = glob.glob('tmpdeb/usr/share/mirvdesk/libdrmtap.so.0.*')
     bundle_carries_so = any(os.path.isfile(p) and not os.path.islink(p) for p in bundled_glob)
     # The variant must be decided by the EXPLICIT --drm request, not merely by what happens to be
     # staged: a bundle that carries the .so must NOT be shipped as the consent-bypass variant when
@@ -867,7 +870,7 @@ def build_deb_from_folder(version, binary_folder, want_drm=False):
             _assert_so_has_egl(so)
             stage_libdrmtap_into_deb(so)
             system2(f'rm -f "{so}"')
-            system2('rm -f tmpdeb/usr/share/rustdesk/libdrmtap.so tmpdeb/usr/share/rustdesk/libdrmtap.so.0')
+            system2('rm -f tmpdeb/usr/share/mirvdesk/libdrmtap.so tmpdeb/usr/share/mirvdesk/libdrmtap.so.0')
         else:
             # Build it here, exactly as the flutter deb path does (build_libdrmtap_so asserts the
             # EGL backend itself). The library is independent of the staged binary.
@@ -881,13 +884,13 @@ def build_deb_from_folder(version, binary_folder, want_drm=False):
         retarget_control_to_drm_variant()
     system2('cp -a ../res/DEBIAN/* tmpdeb/DEBIAN/')
     md5_file_folder("tmpdeb/")
-    system2('dpkg-deb -b tmpdeb rustdesk.deb;')
+    system2('dpkg-deb -b tmpdeb mirvdesk.deb;')
 
     system2('/bin/rm -rf tmpdeb/')
     system2('/bin/rm -rf ../res/DEBIAN/control')
-    os.rename('rustdesk.deb', '../rustdesk-%s.deb' % version)
+    os.rename('mirvdesk.deb', '../mirvdesk-%s.deb' % version)
     if want_drm:
-        os.rename('../rustdesk-%s.deb' % version, f'../{DRM_PACKAGE_NAME}-{version}.deb')
+        os.rename('../mirvdesk-%s.deb' % version, f'../{DRM_PACKAGE_NAME}-{version}.deb')
     os.chdir("..")
 
 
@@ -1063,7 +1066,7 @@ def main():
                 pass
             else:
                 # system2(
-                #     'mv target/release/bundle/deb/rustdesk*.deb ./flutter/rustdesk.deb')
+                #     'mv target/release/bundle/deb/rustdesk*.deb ./flutter/mirvdesk.deb')
                 build_flutter_deb(version, features)
         else:
             system2('cargo --locked bundle --release --features ' + features)
@@ -1109,29 +1112,29 @@ def main():
             else:
                 # build deb package
                 system2(
-                    'mv target/release/bundle/deb/rustdesk*.deb ./rustdesk.deb')
-                system2('dpkg-deb -R rustdesk.deb tmpdeb')
-                system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
+                    'mv target/release/bundle/deb/rustdesk*.deb ./mirvdesk.deb')
+                system2('dpkg-deb -R mirvdesk.deb tmpdeb')
+                system2('mkdir -p tmpdeb/usr/share/mirvdesk/files/systemd/')
                 system2('mkdir -p tmpdeb/usr/share/icons/hicolor/256x256/apps/')
                 system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
                 system2(
-                    'cp res/rustdesk.service tmpdeb/usr/share/rustdesk/files/systemd/')
+                    'cp res/rustdesk.service tmpdeb/usr/share/mirvdesk/files/systemd/mirvdesk.service')
                 system2(
-                    'cp res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/rustdesk.png')
+                    'cp res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/mirvdesk.png')
                 system2(
-                    'cp res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/rustdesk.svg')
+                    'cp res/scalable.svg tmpdeb/usr/share/icons/hicolor/scalable/apps/mirvdesk.svg')
                 system2(
-                    'cp res/rustdesk.desktop tmpdeb/usr/share/applications/rustdesk.desktop')
+                    'cp res/rustdesk.desktop tmpdeb/usr/share/applications/mirvdesk.desktop')
                 system2(
-                    'cp res/rustdesk-link.desktop tmpdeb/usr/share/applications/rustdesk-link.desktop')
+                    'cp res/rustdesk-link.desktop tmpdeb/usr/share/applications/mirvdesk-link.desktop')
                 os.system('cp -a DEBIAN/* tmpdeb/DEBIAN/')
                 system2('strip tmpdeb/usr/bin/rustdesk')
-                system2('mkdir -p tmpdeb/usr/share/rustdesk')
-                system2('mv tmpdeb/usr/bin/rustdesk tmpdeb/usr/share/rustdesk/')
-                system2('cp libsciter-gtk.so tmpdeb/usr/share/rustdesk/')
+                system2('mkdir -p tmpdeb/usr/share/mirvdesk')
+                system2('mv tmpdeb/usr/bin/rustdesk tmpdeb/usr/share/mirvdesk/mirvdesk')
+                system2('cp libsciter-gtk.so tmpdeb/usr/share/mirvdesk/')
                 md5_file_folder("tmpdeb/")
-                system2('dpkg-deb -b tmpdeb rustdesk.deb; /bin/rm -rf tmpdeb/')
-                os.rename('rustdesk.deb', 'rustdesk-%s.deb' % version)
+                system2('dpkg-deb -b tmpdeb mirvdesk.deb; /bin/rm -rf tmpdeb/')
+                os.rename('mirvdesk.deb', 'mirvdesk-%s.deb' % version)
 
 
 def md5_file(fn):

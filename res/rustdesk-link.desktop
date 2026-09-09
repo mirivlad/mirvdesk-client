@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=RustDesk
+Name=MirvDesk
 NoDisplay=true
-MimeType=x-scheme-handler/rustdesk;
-TryExec=rustdesk
-Exec=rustdesk %u
-Icon=rustdesk
+MimeType=x-scheme-handler/mirvdesk;
+TryExec=mirvdesk
+Exec=mirvdesk %u
+Icon=mirvdesk
 Terminal=false
 Type=Application
 StartupNotify=false
-StartupWMClass=rustdesk
+StartupWMClass=mirvdesk
