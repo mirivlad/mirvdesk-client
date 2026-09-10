@@ -86,6 +86,7 @@ fn install_android_deps() {
 }
 
 fn configure_mirvdesk_default_server() {
+    // Deliberately no fallback: every MirvDesk build must name its self-hosted server.
     let raw = std::env::var("MIRVDESK_SERVER_URL").unwrap_or_else(|_| {
         panic!(
             "MIRVDESK_SERVER_URL is required. MirvDesk is self-hosted: deploy your own MirvDesk Server and set MIRVDESK_SERVER_URL to its http(s) URL before building."
