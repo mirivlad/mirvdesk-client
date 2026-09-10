@@ -101,6 +101,8 @@ The supported reproducible build path is GitHub Actions. After defining `MIRVDES
 
 See [docs/CI.md](docs/CI.md) for the CI layout and [docs/MIRVDESK_SELF_HOST_BUILD.md](docs/MIRVDESK_SELF_HOST_BUILD.md) for self-host build requirements.
 
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the next administration milestones and [docs/UPSTREAM_COMPATIBILITY.md](docs/UPSTREAM_COMPATIBILITY.md) for the rules used to keep MirvDesk maintainable as a RustDesk downstream.
+
 For lower-level platform dependencies and RustDesk internals, refer to the [upstream RustDesk build documentation](https://rustdesk.com/docs/en/dev/build/). MirvDesk keeps the upstream source layout closely enough that those prerequisites remain useful, but the MirvDesk bootstrap variable is additionally mandatory.
 
 ## Current status
