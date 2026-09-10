@@ -1765,6 +1765,7 @@ jobs:
             done
 
       - name: Verify MirvDesk bootstrap in Debian package
+        if: matrix.job.arch == 'x86_64' || env.UPLOAD_ARTIFACT == 'true'
         shell: bash
         run: |
           .github/scripts/verify-mirvdesk-bootstrap.sh "mirvdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.deb"
