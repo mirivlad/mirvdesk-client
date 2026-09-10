@@ -125,6 +125,7 @@ fn discover_default_mirvdesk_server() {
     const DEFAULT_SERVER_URL: &str = env!("MIRVDESK_DEFAULT_SERVER_URL");
     const BOOTSTRAP_URL_OPTION: &str = "mirvdesk-bootstrap-url";
     const BOOTSTRAP_ID_OPTION: &str = "mirvdesk-bootstrap-id";
+    const BOOTSTRAP_FEATURES_OPTION: &str = "mirvdesk-bootstrap-features-v1";
     const API_AUTH_ONLY_OPTION: &str = "mirvdesk-api-auth-only";
 
     let base = DEFAULT_SERVER_URL.trim().trim_end_matches('/');
@@ -135,6 +136,7 @@ fn discover_default_mirvdesk_server() {
     let current_id = Config::get_option("custom-rendezvous-server");
     let previous_url = Config::get_option(BOOTSTRAP_URL_OPTION);
     let previous_id = Config::get_option(BOOTSTRAP_ID_OPTION);
+    let previous_features = Config::get_option(BOOTSTRAP_FEATURES_OPTION);
     let first_setup = current_id.is_empty();
     let auto_managed =
         !previous_url.is_empty() && !previous_id.is_empty() && current_id == previous_id;
@@ -144,12 +146,22 @@ fn discover_default_mirvdesk_server() {
             options.insert(API_AUTH_ONLY_OPTION.to_owned(), "Y".to_owned());
             Config::set_options(options);
         }
-        if LocalConfig::get_option("disable-group-panel") != "Y" {
-            LocalConfig::set_option("disable-group-panel".to_owned(), "Y".to_owned());
-        }
+        let groups_enabled = previous_features
+            .split(',')
+            .any(|feature| feature.trim() == "groups");
+        LocalConfig::set_option(
+            "disable-group-panel".to_owned(),
+            if groups_enabled { "" } else { "Y" }.to_owned(),
+        );
     }
     let default_url_changed = auto_managed && previous_url != base;
-    if !first_setup && !default_url_changed {
+    // Re-probe older MirvDesk servers on launch until they advertise group support.
+    // This lets an existing client enable Groups after only the server is upgraded.
+    let feature_refresh = auto_managed
+        && !previous_features
+            .split(',')
+            .any(|feature| feature.trim() == "groups");
+    if !first_setup && !default_url_changed && !feature_refresh {
         return;
     }
 
@@ -174,6 +186,19 @@ fn discover_default_mirvdesk_server() {
         let relay_server = value("relay_server");
         let api_server = value("api_server").trim_end_matches('/').to_owned();
         let key = value("key");
+        let capabilities = data
+            .get("capabilities")
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str())
+                    .map(str::trim)
+                    .filter(|item| !item.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let groups_enabled = capabilities.iter().any(|feature| *feature == "groups");
         if id_server.is_empty() || api_server.is_empty() || key.is_empty() {
             bail!("incomplete MirvDesk discovery response");
         }
@@ -185,9 +210,20 @@ fn discover_default_mirvdesk_server() {
         options.insert("key".to_owned(), key);
         options.insert(BOOTSTRAP_URL_OPTION.to_owned(), base.to_owned());
         options.insert(BOOTSTRAP_ID_OPTION.to_owned(), id_server);
+        options.insert(
+            BOOTSTRAP_FEATURES_OPTION.to_owned(),
+            if capabilities.is_empty() {
+                "none".to_owned()
+            } else {
+                capabilities.join(",")
+            },
+        );
         options.insert(API_AUTH_ONLY_OPTION.to_owned(), "Y".to_owned());
         Config::set_options(options);
-        LocalConfig::set_option("disable-group-panel".to_owned(), "Y".to_owned());
+        LocalConfig::set_option(
+            "disable-group-panel".to_owned(),
+            if groups_enabled { "" } else { "Y" }.to_owned(),
+        );
         Ok(())
     })();
 

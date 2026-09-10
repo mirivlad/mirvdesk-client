@@ -1,207 +1,133 @@
-<!-- MIRVDESK-INTRO -->
-# MirvDesk Client
-
-MirvDesk Client is an independent downstream client based on RustDesk and designed to work with [MirvDesk Server](https://github.com/mirivlad/mirvdesk-server). It stays close to upstream RustDesk while adding MirvDesk account/address-book integration and server discovery. MirvDesk is not affiliated with or endorsed by RustDesk/Purslane.
-
-## Self-hosted builds require your own server
-
-MirvDesk is a **self-hosted** project. This repository is the client; the server is [mirivlad/mirvdesk-server](https://github.com/mirivlad/mirvdesk-server). MirvDesk does **not** provide a public/default server and does not fall back to the project author's infrastructure.
-
-Before compiling, deploy your own MirvDesk Server and set `MIRVDESK_SERVER_URL` to its base URL, for example `https://desk.example.com`. For GitHub Actions, create it as a repository variable under **Settings → Secrets and variables → Actions → Variables**. For a local build, export it in the shell before running Cargo or `build.py`.
-
-```sh
-export MIRVDESK_SERVER_URL="https://desk.example.com"
-cargo build --release
-```
-
-The build **fails deliberately** when `MIRVDESK_SERVER_URL` is missing or empty. Release binaries embed only this bootstrap URL; credentials and tokens must never be placed in it. On first launch the client requests `/.well-known/mirvdesk` from your server and discovers the ID server, relay server, API URL and public key.
-
-See [Building MirvDesk for your own server](docs/MIRVDESK_SELF_HOST_BUILD.md) for the complete setup.
-
-CI is split into fast per-push checks, manual/nightly full builds and tag-only release builds; see [MirvDesk CI strategy](docs/CI.md).
-
----
-
-## Upstream RustDesk README
-
 <p align="center">
-  <img src="res/logo-header.svg" alt="RustDesk - Your remote desktop"><br>
-  <a href="#raw-steps-to-build">Build</a> •
-  <a href="#how-to-build-with-docker">Docker</a> •
-  <a href="#file-structure">Structure</a> •
-  <a href="#screenshots">Screenshots</a><br>
-  [<a href="docs/README-UA.md">Українська</a>] | [<a href="docs/README-CS.md">česky</a>] | [<a href="docs/README-ZH.md">中文</a>] | [<a href="docs/README-HU.md">Magyar</a>] | [<a href="docs/README-ES.md">Español</a>] | [<a href="docs/README-FA.md">فارسی</a>] | [<a href="docs/README-FR.md">Français</a>] | [<a href="docs/README-DE.md">Deutsch</a>] | [<a href="docs/README-PL.md">Polski</a>] | [<a href="docs/README-ID.md">Indonesian</a>] | [<a href="docs/README-FI.md">Suomi</a>] | [<a href="docs/README-ML.md">മലയാളം</a>] | [<a href="docs/README-JP.md">日本語</a>] | [<a href="docs/README-NL.md">Nederlands</a>] | [<a href="docs/README-IT.md">Italiano</a>] | [<a href="docs/README-RU.md">Русский</a>] | [<a href="docs/README-PTBR.md">Português (Brasil)</a>] | [<a href="docs/README-EO.md">Esperanto</a>] | [<a href="docs/README-KR.md">한국어</a>] | [<a href="docs/README-AR.md">العربي</a>] | [<a href="docs/README-VN.md">Tiếng Việt</a>] | [<a href="docs/README-DA.md">Dansk</a>] | [<a href="docs/README-GR.md">Ελληνικά</a>] | [<a href="docs/README-TR.md">Türkçe</a>] | [<a href="docs/README-NO.md">Norsk</a>] | [<a href="docs/README-RO.md">Română</a>]<br>
-  <b>We need your help to translate this README, <a href="https://github.com/rustdesk/rustdesk/tree/master/src/lang">RustDesk UI</a> and <a href="https://github.com/rustdesk/doc.rustdesk.com">RustDesk Doc</a> to your native language</b>
+  <img src="res/logo.svg" width="128" alt="MirvDesk logo">
 </p>
 
-> [!Caution]
-> **Misuse Disclaimer:** <br>
-> The developers of RustDesk do not condone or support any unethical or illegal use of this software. Misuse, such as unauthorized access, control or invasion of privacy, is strictly against our guidelines. The authors are not responsible for any misuse of the application.
+# MirvDesk Client
 
+MirvDesk is a self-hosted remote desktop system built as an independent downstream of [RustDesk](https://github.com/rustdesk/rustdesk). The client stays close to upstream RustDesk for the remote-control engine and user interface while adding MirvDesk server discovery, accounts, personal address books, device groups, independent application identity and packaging.
 
-Chat with us: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/rustdesk) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
+MirvDesk is not affiliated with or endorsed by RustDesk/Purslane.
 
-[![RustDesk Server Pro](https://img.shields.io/badge/RustDesk%20Server%20Pro-Advanced%20Features-blue)](https://rustdesk.com/pricing.html)
+## What MirvDesk adds
 
-Yet another remote desktop solution, written in Rust. Works out of the box with no configuration required. You have full control of your data, with no concerns about security. You can use our rendezvous/relay server, [set up your own](https://rustdesk.com/server), or [write your own rendezvous/relay server](https://github.com/rustdesk/rustdesk-server-demo).
+- a separate **MirvDesk** application identity, configuration, services and URI scheme, so MirvDesk and RustDesk can be installed on the same machine;
+- mandatory self-hosted server bootstrap: a build is tied only to the server URL chosen by the person compiling it;
+- MirvDesk account login and personal address-book synchronization;
+- **Accessible devices / Groups** with server-side user and device-group permissions;
+- a distinct teal/cyan MirvDesk visual palette and application icons;
+- native packages for Windows, Linux, macOS and Android;
+- CI separated into fast push checks, full cross-platform validation and release builds.
 
-![image](https://user-images.githubusercontent.com/71636191/171661982-430285f0-2e12-4b1d-9957-4a58e375304d.png)
+## You need your own server
 
-RustDesk welcomes contribution from everyone. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for help getting started.
+MirvDesk deliberately has **no public/default server**. This repository contains the client; the companion backend is [mirivlad/mirvdesk-server](https://github.com/mirivlad/mirvdesk-server).
 
-[**FAQ**](https://github.com/rustdesk/rustdesk/wiki/FAQ)
+Deploy your own MirvDesk Server first. The usual public ports are:
 
-[**BINARY DOWNLOAD**](https://github.com/rustdesk/rustdesk/releases)
+| Port | Protocol | Purpose |
+|---|---|---|
+| 21115 | TCP | NAT type / rendezvous support |
+| 21116 | TCP + UDP | ID / rendezvous |
+| 21117 | TCP | relay |
+| 21114 | HTTP behind HTTPS reverse proxy | MirvDesk API and discovery |
 
-[**NIGHTLY BUILD**](https://github.com/rustdesk/rustdesk/releases/tag/nightly)
+See the server repository for the recommended Docker/Portainer + nginx deployment.
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="80">](https://f-droid.org/en/packages/com.carriez.flutter_hbb)
-[<img src="https://flathub.org/api/badge?svg&locale=en"
-    alt="Get it on Flathub"
-    height="80">](https://flathub.org/apps/com.rustdesk.RustDesk)
+## Mandatory build variable
 
-## Dependencies
+Every MirvDesk client build must define `MIRVDESK_SERVER_URL` with the public base URL of **your own** server, for example:
 
-Desktop versions use Flutter or Sciter (deprecated) for GUI. This tutorial is for Sciter only, since it is easier and more friendly to start. Check out our [CI](https://github.com/rustdesk/rustdesk/blob/master/.github/workflows/flutter-build.yml) for building the Flutter version.
-
-Please download Sciter dynamic library yourself.
-
-[Windows](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.win/x64/sciter.dll) |
-[Linux](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so) |
-[macOS](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.osx/libsciter.dylib)
-
-## Raw Steps to build
-
-- Prepare your Rust development env and C++ build env
-
-- Install [vcpkg](https://github.com/microsoft/vcpkg), and set `VCPKG_ROOT` env variable correctly
-
-  - Windows: vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
-  - Linux/macOS: vcpkg install libvpx libyuv opus aom
-
-- run `cargo run`
-
-## [Build](https://rustdesk.com/docs/en/dev/build/)
-
-## How to Build on Linux
-
-### Ubuntu 18 (Debian 10)
-
-```sh
-sudo apt install -y zip g++ gcc git curl wget nasm yasm libgtk-3-dev clang libxcb-randr0-dev libxdo-dev \
-        libxfixes-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev cmake make \
-        libclang-dev ninja-build libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+```text
+https://desk.example.com
 ```
 
-### openSUSE Tumbleweed
+There is no fallback value. A missing, empty, malformed, or credential-bearing value fails the build intentionally.
 
-```sh
-sudo zypper install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libXfixes-devel cmake alsa-lib-devel gstreamer-devel gstreamer-plugins-base-devel xdotool-devel
+For a GitHub Actions build in your fork, create the repository variable:
+
+**Settings → Secrets and variables → Actions → Variables → `MIRVDESK_SERVER_URL`**
+
+For a local build:
+
+```bash
+export MIRVDESK_SERVER_URL="https://desk.example.com"
 ```
 
-### Fedora 28 (CentOS 8)
+The URL is not a secret: it is embedded into the client binary. Never put passwords, tokens or user information in it.
 
-```sh
-sudo yum -y install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libxdo-devel libXfixes-devel pulseaudio-libs-devel cmake alsa-lib-devel gstreamer1-devel gstreamer1-plugins-base-devel
+On first launch MirvDesk requests:
+
+```text
+https://desk.example.com/.well-known/mirvdesk
 ```
 
-### Arch (Manjaro)
+and discovers the ID server, relay server, API URL, public key and server capabilities. Release CI verifies that Linux packages actually contain the configured bootstrap URL before publication.
 
-```sh
-sudo pacman -Syu --needed unzip git cmake gcc curl wget yasm nasm zip make pkg-config clang gtk3 xdotool libxcb libxfixes alsa-lib pipewire
+More detail: [docs/MIRVDESK_SELF_HOST_BUILD.md](docs/MIRVDESK_SELF_HOST_BUILD.md).
+
+## Groups and users
+
+MirvDesk 1.6 introduces the RustDesk-compatible **Accessible devices / Groups** view.
+
+The server records a device when its owner logs in. Server administrators can create regular users, create device groups, assign devices to groups and grant users access to those groups using `mirvdesk-admin`. The client then shows only the devices accessible to the logged-in account; server administrators can see all registered devices.
+
+Example server-side administration:
+
+```bash
+docker exec -it mirvdesk-server mirvdesk-admin create-user
+docker exec -it mirvdesk-server mirvdesk-admin group-create Operations
+docker exec -it mirvdesk-server mirvdesk-admin devices
+docker exec -it mirvdesk-server mirvdesk-admin device-group 123456789 Operations
+docker exec -it mirvdesk-server mirvdesk-admin group-add-user Operations alice
 ```
 
-### Install vcpkg
+Personal Address Book remains separate from Groups and continues to sync per account.
 
-```sh
-git clone https://github.com/microsoft/vcpkg
-cd vcpkg
-git checkout 2023.04.15
-cd ..
-vcpkg/bootstrap-vcpkg.sh
-export VCPKG_ROOT=$HOME/vcpkg
-vcpkg/vcpkg install libvpx libyuv opus aom
-```
+## Coexisting with RustDesk
 
-### Fix libvpx (For Fedora)
+MirvDesk intentionally uses its own external identity:
 
-```sh
-cd vcpkg/buildtrees/libvpx/src
-cd *
-./configure
-sed -i 's/CFLAGS+=-I/CFLAGS+=-fPIC -I/g' Makefile
-sed -i 's/CXXFLAGS+=-I/CXXFLAGS+=-fPIC -I/g' Makefile
-make
-cp libvpx.a $HOME/vcpkg/installed/x64-linux/lib/
-cd
-```
+- application/config namespace: `MirvDesk`;
+- Linux command/service/install paths: `mirvdesk`, `mirvdesk.service`, `/usr/share/mirvdesk`;
+- mobile bundle/application IDs: `top.mirv.mirvdesk`;
+- URI scheme: `mirvdesk://`;
+- separate Windows service/runtime names and macOS transient state.
 
-### Build
+Some internal crate, ABI and native-library names still contain `rustdesk`. Those are upstream implementation details and are deliberately retained where renaming would create needless merge and compatibility risk; they do not make MirvDesk share user configuration with RustDesk.
 
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-git clone --recurse-submodules https://github.com/rustdesk/rustdesk
-cd rustdesk
-mkdir -p target/debug
-wget https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so
-mv libsciter-gtk.so target/debug
-VCPKG_ROOT=$HOME/vcpkg cargo run
-```
+## Building
 
-## How to build with Docker
+The supported reproducible build path is GitHub Actions. After defining `MIRVDESK_SERVER_URL`, normal pushes run only the fast validation suite. Full cross-platform builds are available manually, nightly, or through `ci/full/**` branches. Version tags run the release pipeline and publish packages.
 
-Begin by cloning the repository and building the Docker container:
+See [docs/CI.md](docs/CI.md) for the CI layout and [docs/MIRVDESK_SELF_HOST_BUILD.md](docs/MIRVDESK_SELF_HOST_BUILD.md) for self-host build requirements.
 
-```sh
-git clone https://github.com/rustdesk/rustdesk
-cd rustdesk
-git submodule update --init --recursive
-docker build -t "rustdesk-builder" .
-```
+For lower-level platform dependencies and RustDesk internals, refer to the [upstream RustDesk build documentation](https://rustdesk.com/docs/en/dev/build/). MirvDesk keeps the upstream source layout closely enough that those prerequisites remain useful, but the MirvDesk bootstrap variable is additionally mandatory.
 
-Then, each time you need to build the application, run the following command:
+## Current status
 
-```sh
-docker run --rm -it -v $PWD:/home/user/rustdesk -v rustdesk-git-cache:/home/user/.cargo/git -v rustdesk-registry-cache:/home/user/.cargo/registry -e PUID="$(id -u)" -e PGID="$(id -g)" rustdesk-builder
-```
+Implemented:
 
-Note that the first build may take longer before dependencies are cached, subsequent builds will be faster. Additionally, if you need to specify different arguments to the build command, you may do so at the end of the command in the `<OPTIONAL-ARGS>` position. For instance, if you wanted to build an optimized release version, you would run the command above followed by `--release`. The resulting executable will be available in the target folder on your system, and can be run with:
+- remote desktop, file transfer, TCP tunneling and the main RustDesk feature set inherited from upstream;
+- independent MirvDesk branding/configuration/packaging;
+- runtime discovery from a self-hosted MirvDesk Server;
+- account authentication;
+- personal address-book synchronization;
+- Accessible devices / Groups;
+- Windows, Linux, macOS and Android release builds.
 
-```sh
-target/debug/rustdesk
-```
+Not yet implemented in the MirvDesk backend:
 
-Or, if you're running a release executable:
+- shared address books/profiles beyond the personal address book;
+- a MirvDesk-specific automatic update channel. The stock RustDesk updater is intentionally disabled so MirvDesk cannot replace itself with an upstream RustDesk build.
 
-```sh
-target/release/rustdesk
-```
+## Repositories
 
-Please ensure that you run these commands from the root of the RustDesk repository, or the application may not find the required resources. Also note that other cargo subcommands such as `install` or `run` are not currently supported via this method as they would install or run the program inside the container instead of the host.
+- Client: https://github.com/mirivlad/mirvdesk-client
+- Server: https://github.com/mirivlad/mirvdesk-server
+- Upstream client: https://github.com/rustdesk/rustdesk
 
-## File Structure
+## License and attribution
 
-- **[libs/hbb_common](https://github.com/rustdesk/rustdesk/tree/master/libs/hbb_common)**: video codec, config, tcp/udp wrapper, protobuf, fs functions for file transfer, and some other utility functions
-- **[libs/scrap](https://github.com/rustdesk/rustdesk/tree/master/libs/scrap)**: screen capture
-- **[libs/enigo](https://github.com/rustdesk/rustdesk/tree/master/libs/enigo)**: platform specific keyboard/mouse control
-- **[libs/clipboard](https://github.com/rustdesk/rustdesk/tree/master/libs/clipboard)**: file copy and paste implementation for Windows, Linux, macOS.
-- **[src/ui](https://github.com/rustdesk/rustdesk/tree/master/src/ui)**: obsolete Sciter UI (deprecated)
-- **[src/server](https://github.com/rustdesk/rustdesk/tree/master/src/server)**: audio/clipboard/input/video services, and network connections
-- **[src/client.rs](https://github.com/rustdesk/rustdesk/tree/master/src/client.rs)**: start a peer connection
-- **[src/rendezvous_mediator.rs](https://github.com/rustdesk/rustdesk/tree/master/src/rendezvous_mediator.rs)**: Communicate with [rustdesk-server](https://github.com/rustdesk/rustdesk-server), wait for remote direct (TCP hole punching) or relayed connection
-- **[src/platform](https://github.com/rustdesk/rustdesk/tree/master/src/platform)**: platform specific code
-- **[flutter](https://github.com/rustdesk/rustdesk/tree/master/flutter)**: Flutter code for desktop and mobile
+MirvDesk is distributed under **AGPL-3.0**. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).
 
-## Screenshots
-
-![Connection Manager](https://github.com/rustdesk/rustdesk/assets/28412477/db82d4e7-c4bc-4823-8e6f-6af7eadf7651)
-
-![Connected to a Windows PC](https://github.com/rustdesk/rustdesk/assets/28412477/9baa91e9-3362-4d06-aa1a-7518edcbd7ea)
-
-![File Transfer](https://github.com/rustdesk/rustdesk/assets/28412477/39511ad3-aa9a-4f8c-8947-1cce286a46ad)
-
-![TCP Tunneling](https://github.com/rustdesk/rustdesk/assets/28412477/78e8708f-e87e-4570-8373-1360033ea6c5)
-
+RustDesk is developed by the RustDesk project/Purslane and is also distributed under AGPL-3.0. MirvDesk is an independent downstream project and preserves upstream copyright and license notices where required.

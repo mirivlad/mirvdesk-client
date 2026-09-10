@@ -27,3 +27,9 @@ cargo build --release
 The build fails if `MIRVDESK_SERVER_URL` is missing, empty, or does not start with `http://` or `https://`. There is no fallback to the MirvDesk author's infrastructure.
 
 At first launch the client requests `/.well-known/mirvdesk` from that base URL and discovers the ID server, relay server, API URL and public key. Release CI also checks Linux packages to ensure the configured bootstrap URL was actually embedded.
+
+## Server capabilities
+
+The discovery document can advertise optional server capabilities. MirvDesk 1.6 uses the `groups` capability to enable the **Accessible devices / Groups** tab only when the connected MirvDesk Server actually supports the required APIs. Older servers continue to work for remote control, accounts and the personal Address Book; the Groups UI stays hidden until the server is upgraded.
+
+For MirvDesk 1.6 Groups, use an up-to-date build of [mirivlad/mirvdesk-server](https://github.com/mirivlad/mirvdesk-server).

@@ -99,7 +99,7 @@ class MsgboxComponent: Reactor.Component {
         if (this.type.indexOf("error") >= 0 || this.type == "re-input-password") {
             return "#e04f5f";
         }
-        return "#2C8CFF";
+        return "#00A3AD";
     }
 
     function hasSkip() {

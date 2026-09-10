@@ -1,5 +1,5 @@
 pkgname=mirvdesk
-pkgver=1.5.1
+pkgver=1.6.0
 pkgrel=0
 epoch=
 pkgdesc="MirvDesk self-hosted remote desktop client"

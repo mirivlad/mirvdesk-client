@@ -40,11 +40,13 @@ jobs:
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
-            v1.5.1 fixes bootstrap URL propagation into containerized Linux builds. Linux release CI now verifies that the configured bootstrap URL is actually embedded before a package can be published.
+            **1.6.0** adds the Accessible devices / Groups workflow backed by MirvDesk Server: registered devices can be assigned to groups and users can be granted access to those groups. The client enables the existing Groups UI only when the server advertises the `groups` capability. Upgrade MirvDesk Server before using this feature: https://github.com/mirivlad/mirvdesk-server.
 
-            MirvDesk deliberately has no public/default server. Builders must deploy their own MirvDesk Server and create the `MIRVDESK_SERVER_URL` repository variable before compiling or publishing a release; missing or empty values now fail the build. The server project is https://github.com/mirivlad/mirvdesk-server.
+            This release also completes the self-host build contract. MirvDesk deliberately has no public/default server: every builder must deploy their own server and define `MIRVDESK_SERVER_URL`. Missing or invalid values fail the build, Linux container builds receive the variable explicitly, and release CI verifies the configured bootstrap URL inside generated Debian packages.
 
-            MirvDesk remains branded and isolated from an installed RustDesk client. Personal Address Book remains available; the upstream Accessible devices / Groups panel is hidden until the MirvDesk server implements that API. Stock RustDesk auto-update remains disabled.
+            CI is now split into fast push checks, full cross-platform validation and tag-only release builds. MirvDesk also uses a teal/cyan application palette so it is visually distinct from RustDesk while retaining an independently isolated application/configuration/service namespace.
+
+            Personal Address Book remains available. Shared address books are not implemented yet. Stock RustDesk auto-update remains disabled so MirvDesk cannot replace itself with an upstream RustDesk build.
 
             Packages are built by GitHub Actions for Windows, Linux, macOS and Android.
 

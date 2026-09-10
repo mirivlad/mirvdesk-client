@@ -16,6 +16,6 @@ The nightly workflow runs the same full matrix automatically and does not publis
 
 ## Release CI
 
-A version tag such as `v1.5.1` runs `MirvDesk Tag Build`. Release CI builds and publishes the supported Windows, Linux, macOS and Android artifacts, generates the SBOM, and checks Linux packages for the configured `MIRVDESK_SERVER_URL` bootstrap value before publication.
+A version tag such as `v1.6.0` runs `MirvDesk Tag Build`. Release CI builds and publishes the supported Windows, Linux, macOS and Android artifacts, generates the SBOM, and checks Linux packages for the configured `MIRVDESK_SERVER_URL` bootstrap value before publication.
 
 Legacy 32-bit Windows/Sciter is not a supported MirvDesk release target and is not part of the matrix. Linux ARM64 remains part of full/release builds; it is not spent on every development push.
