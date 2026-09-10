@@ -10,7 +10,27 @@ permissions:
   contents: write
 
 jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require self-hosted MirvDesk server URL
+        shell: bash
+        env:
+          MIRVDESK_SERVER_URL: ${{ vars.MIRVDESK_SERVER_URL }}
+        run: |
+          set -euo pipefail
+          url="${MIRVDESK_SERVER_URL%/}"
+          if [[ -z "$url" ]]; then
+            echo "::error::MIRVDESK_SERVER_URL is required. Deploy your own MirvDesk Server and create this repository variable before building."
+            exit 1
+          fi
+          case "$url" in
+            http://*|https://*) ;;
+            *) echo "::error::MIRVDESK_SERVER_URL must start with http:// or https://"; exit 1 ;;
+          esac
+
   run-flutter-nightly-build:
+    needs: validate-config
     uses: ./.github/workflows/flutter-build.yml
     secrets: inherit
     with:

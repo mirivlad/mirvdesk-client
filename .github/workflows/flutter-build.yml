@@ -51,7 +51,7 @@ env:
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
   VCPKG_CMAKE_VERSION: "4.3.0"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
-  VERSION: "1.5.0"
+  VERSION: "1.5.1"
   NDK_VERSION: "r28c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
@@ -1598,6 +1598,7 @@ jobs:
             ls -l "${PWD}"
             ls -l /opt/artifacts/vcpkg/installed
           dockerRunArgs: |
+            --env MIRVDESK_SERVER_URL
             --volume "${PWD}:/workspace"
             --volume "/opt/artifacts:/opt/artifacts"
           shell: /bin/bash
@@ -1762,6 +1763,11 @@ jobs:
             for name in mirvdesk*??.rpm; do
                 mv "$name" /workspace/"${name%%.rpm}-suse.rpm"
             done
+
+      - name: Verify MirvDesk bootstrap in Debian package
+        shell: bash
+        run: |
+          .github/scripts/verify-mirvdesk-bootstrap.sh "mirvdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.deb"
 
       - name: Publish MirvDesk Debian package
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -1932,6 +1938,7 @@ jobs:
             ls -l "${PWD}"
             ls -l /opt/artifacts/vcpkg/installed
           dockerRunArgs: |
+            --env MIRVDESK_SERVER_URL
             --volume "${PWD}:/workspace"
             --volume "/opt/artifacts:/opt/artifacts"
           shell: /bin/bash
@@ -2066,6 +2073,11 @@ jobs:
           fi
         shell: bash
 
+      - name: Verify MirvDesk bootstrap in DRM Debian package
+        shell: bash
+        run: |
+          .github/scripts/verify-mirvdesk-bootstrap.sh "${{ env.DRM_DEB }}"
+
       - name: Publish debian package
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
@@ -2167,6 +2179,7 @@ jobs:
           setup: |
             ls -l "${PWD}"
           dockerRunArgs: |
+            --env MIRVDESK_SERVER_URL
             --volume "${PWD}:/workspace"
           shell: /bin/bash
           install: |
@@ -2309,6 +2322,11 @@ jobs:
               mv "$name" "${name%%.deb}-${{ matrix.job.arch }}-sciter.deb"
           done
 
+      - name: Verify MirvDesk bootstrap in Sciter Debian package
+        shell: bash
+        run: |
+          .github/scripts/verify-mirvdesk-bootstrap.sh "mirvdesk-${{ env.VERSION }}-${{ matrix.job.arch }}-sciter.deb"
+
       - name: Publish debian package
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
@@ -2436,6 +2454,7 @@ jobs:
           setup: |
             ls -l "${PWD}"
           dockerRunArgs: |
+            --env MIRVDESK_SERVER_URL
             --volume "${PWD}:/workspace"
           shell: /bin/bash
           install: |

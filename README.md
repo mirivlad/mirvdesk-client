@@ -3,15 +3,20 @@
 
 MirvDesk Client is an independent downstream client based on RustDesk and designed to work with [MirvDesk Server](https://github.com/mirivlad/mirvdesk-server). It stays close to upstream RustDesk while adding MirvDesk account/address-book integration and server discovery. MirvDesk is not affiliated with or endorsed by RustDesk/Purslane.
 
-## Zero-config releases for self-hosters
+## Self-hosted builds require your own server
 
-A fork maintainer sets one GitHub Actions repository variable, `MIRVDESK_SERVER_URL`, for example `https://desk.example.com`. No workflow files or tracked source files need to be edited. Release binaries embed only this bootstrap URL.
+MirvDesk is a **self-hosted** project. This repository is the client; the server is [mirivlad/mirvdesk-server](https://github.com/mirivlad/mirvdesk-server). MirvDesk does **not** provide a public/default server and does not fall back to the project author's infrastructure.
 
-For local builds, copy [`mirvdesk.conf.example`](mirvdesk.conf.example) to `mirvdesk.local.conf` and set the same `server_url`; the local file is gitignored.
+Before compiling, deploy your own MirvDesk Server and set `MIRVDESK_SERVER_URL` to its base URL, for example `https://desk.example.com`. For GitHub Actions, create it as a repository variable under **Settings → Secrets and variables → Actions → Variables**. For a local build, export it in the shell before running Cargo or `build.py`.
 
-On first launch, if the client has no manually configured ID server, it requests `/.well-known/mirvdesk` and stores the returned ID server, relay server, API URL, and public key. After that, users can immediately connect by ID or sign in to the MirvDesk address book without entering server settings.
+```sh
+export MIRVDESK_SERVER_URL="https://desk.example.com"
+cargo build --release
+```
 
-If a later release changes the repository variable, clients still using the previously auto-discovered server migrate to the new default automatically. Manually configured server settings are not overwritten. Leaving the variable unset produces a generic unconfigured MirvDesk build.
+The build **fails deliberately** when `MIRVDESK_SERVER_URL` is missing or empty. Release binaries embed only this bootstrap URL; credentials and tokens must never be placed in it. On first launch the client requests `/.well-known/mirvdesk` from your server and discovers the ID server, relay server, API URL and public key.
+
+See [Building MirvDesk for your own server](docs/MIRVDESK_SELF_HOST_BUILD.md) for the complete setup.
 
 ---
 

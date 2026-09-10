@@ -1,3 +1,9 @@
+# MirvDesk: важное примечание для самостоятельной сборки
+
+MirvDesk — **self-hosted** проект. Этот репозиторий содержит клиент, а сервер находится в [mirivlad/mirvdesk-server](https://github.com/mirivlad/mirvdesk-server). Публичного сервера по умолчанию нет. Перед сборкой необходимо поднять свой сервер и задать переменную `MIRVDESK_SERVER_URL`, например `https://desk.example.com`. С пустой или отсутствующей переменной сборка MirvDesk намеренно завершается ошибкой. Подробнее: [MIRVDESK_SELF_HOST_BUILD.md](MIRVDESK_SELF_HOST_BUILD.md).
+
+---
+
 <p align="center">
   <img src="../res/logo-header.svg" alt="RustDesk - Ваш удаленый рабочий стол"><br>
   <a href="#первичные-шаги-для-сборки">Первичные шаги для сборки</a> •

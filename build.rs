@@ -86,24 +86,22 @@ fn install_android_deps() {
 }
 
 fn configure_mirvdesk_default_server() {
-    const LOCAL_PATH: &str = "mirvdesk.local.conf";
-    let from_env = std::env::var("MIRVDESK_SERVER_URL").unwrap_or_default();
-    let local = std::fs::read_to_string(LOCAL_PATH).unwrap_or_default();
-    let from_file = local
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .find_map(|line| line.strip_prefix("server_url="))
-        .map(str::trim)
-        .unwrap_or("");
-    let url = if from_env.trim().is_empty() {
-        from_file
-    } else {
-        from_env.trim()
-    };
+    let raw = std::env::var("MIRVDESK_SERVER_URL").unwrap_or_else(|_| {
+        panic!(
+            "MIRVDESK_SERVER_URL is required. MirvDesk is self-hosted: deploy your own MirvDesk Server and set MIRVDESK_SERVER_URL to its http(s) URL before building."
+        )
+    });
+    let url = raw.trim().trim_end_matches('/');
+    if url.is_empty() {
+        panic!(
+            "MIRVDESK_SERVER_URL must not be empty. MirvDesk does not ship with a public/default server."
+        );
+    }
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        panic!("MIRVDESK_SERVER_URL must start with https:// or http:// (got {url:?})");
+    }
     println!("cargo:rustc-env=MIRVDESK_DEFAULT_SERVER_URL={}", url);
     println!("cargo:rerun-if-env-changed=MIRVDESK_SERVER_URL");
-    println!("cargo:rerun-if-changed={}", LOCAL_PATH);
 }
 
 fn main() {

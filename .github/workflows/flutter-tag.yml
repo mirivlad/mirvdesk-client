@@ -15,6 +15,22 @@ jobs:
   prepare-release:
     runs-on: ubuntu-latest
     steps:
+      - name: Require self-hosted MirvDesk server URL
+        shell: bash
+        env:
+          MIRVDESK_SERVER_URL: ${{ vars.MIRVDESK_SERVER_URL }}
+        run: |
+          set -euo pipefail
+          url="${MIRVDESK_SERVER_URL%/}"
+          if [[ -z "$url" ]]; then
+            echo "::error::MIRVDESK_SERVER_URL is required. Deploy your own MirvDesk Server and create this repository variable before tagging a release."
+            exit 1
+          fi
+          case "$url" in
+            http://*|https://*) ;;
+            *) echo "::error::MIRVDESK_SERVER_URL must start with http:// or https://"; exit 1 ;;
+          esac
+
       - name: Create MirvDesk release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
@@ -23,11 +39,13 @@ jobs:
           prerelease: false
           generate_release_notes: false
           body: |
-            First public MirvDesk release, based on the RustDesk 1.5.0 client.
+            MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
-            MirvDesk is branded and isolated from an installed RustDesk client: it uses its own application identity, configuration/state paths, services, URI scheme and packaging names, so both clients can coexist on the same machine.
+            v1.5.1 fixes bootstrap URL propagation into containerized Linux builds. Linux release CI now verifies that the configured bootstrap URL is actually embedded before a package can be published.
 
-            This release is intended for self-hosted MirvDesk Server deployments. Personal Address Book remains available; the upstream Accessible devices / Groups panel is hidden until the MirvDesk server implements that API. Stock RustDesk auto-update is disabled in MirvDesk for the same reason: updates must not replace MirvDesk with an upstream RustDesk build.
+            MirvDesk deliberately has no public/default server. Builders must deploy their own MirvDesk Server and create the `MIRVDESK_SERVER_URL` repository variable before compiling or publishing a release; missing or empty values now fail the build. The server project is https://github.com/mirivlad/mirvdesk-server.
+
+            MirvDesk remains branded and isolated from an installed RustDesk client. Personal Address Book remains available; the upstream Accessible devices / Groups panel is hidden until the MirvDesk server implements that API. Stock RustDesk auto-update remains disabled.
 
             Packages are built by GitHub Actions for Windows, Linux, macOS and Android.
 
