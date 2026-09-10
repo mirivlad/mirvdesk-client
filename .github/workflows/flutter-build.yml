@@ -439,8 +439,10 @@ jobs:
             ./SignOutput/mirvdesk-*.exe
 
   # The fallback for the flutter version, we use Sciter for 32bit Windows.
+  # Legacy 32-bit Windows/Sciter is intentionally unsupported in MirvDesk.
+  # Keeping the upstream job here makes future upstream merges easier, but it must never run.
   build-for-windows-sciter:
-    if: ${{ !inputs.smoke }}
+    if: ${{ false }}
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
     # Temporarily disable this action due to additional test is needed.
@@ -939,7 +941,6 @@ jobs:
     needs:
       - build-for-macOS
       - build-for-windows-flutter
-      - build-for-windows-sciter
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -969,12 +970,6 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: mirvdesk-unsigned-windows-x86
-          path: ./windows-x86/
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
           name: mirvdesk-unsigned-msi-template-x86_64
           path: ./msi-template/
 
@@ -986,7 +981,7 @@ jobs:
 
       - name: Combine unsigned app
         run: |
-          tar czf mirvdesk-${{ env.VERSION }}-unsigned.tar.gz *.dmg windows-x86_64 windows-aarch64 windows-x86 msi-template
+          tar czf mirvdesk-${{ env.VERSION }}-unsigned.tar.gz *.dmg windows-x86_64 windows-aarch64 msi-template
 
       - name: Publish unsigned app
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1

@@ -1,4 +1,4 @@
-name: CI
+name: Legacy upstream Rust CI (manual)
 
 env:
 #   MIN_SUPPORTED_RUST_VERSION: "1.46.0"
@@ -8,21 +8,9 @@ env:
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
 
 on:
+  # Retained for upstream comparison/debugging only. MirvDesk uses
+  # flutter-ci.yml (fast), flutter-full.yml (full), and flutter-tag.yml (release).
   workflow_dispatch:
-  pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "README.md"
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
-      - "res/**"
-      - "appimage/**"
-      - "flatpak/**"
 
 jobs:
   # ensure_cargo_fmt:

@@ -1,12 +1,13 @@
-name: MirvDesk Nightly Full CI
+name: MirvDesk Full CI
 
 on:
-  schedule:
-    - cron: "0 0 * * *"
   workflow_dispatch:
+  push:
+    branches:
+      - 'ci/full/**'
 
 concurrency:
-  group: mirvdesk-nightly
+  group: mirvdesk-full-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -23,7 +24,7 @@ jobs:
           MIRVDESK_SERVER_URL: ${{ vars.MIRVDESK_SERVER_URL }}
         run: .github/scripts/validate-mirvdesk-config.sh
 
-  run-nightly-full-ci:
+  run-full-ci:
     needs: validate-config
     uses: ./.github/workflows/flutter-build.yml
     secrets: inherit

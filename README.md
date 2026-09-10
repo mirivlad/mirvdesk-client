@@ -18,6 +18,8 @@ The build **fails deliberately** when `MIRVDESK_SERVER_URL` is missing or empty.
 
 See [Building MirvDesk for your own server](docs/MIRVDESK_SELF_HOST_BUILD.md) for the complete setup.
 
+CI is split into fast per-push checks, manual/nightly full builds and tag-only release builds; see [MirvDesk CI strategy](docs/CI.md).
+
 ---
 
 ## Upstream RustDesk README

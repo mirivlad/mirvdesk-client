@@ -1,48 +1,71 @@
-name: Full Flutter CI
+name: MirvDesk Fast CI
 
 on:
   workflow_dispatch:
   pull_request:
     paths-ignore:
-    - "docs/**"
-    - "README.md"
+      - "docs/**"
+      - "README.md"
   push:
     branches:
       - main
       - master
     paths-ignore:
-      - ".github/**"
       - "docs/**"
       - "README.md"
-      - "res/**"
-      - "appimage/**"
-      - "flatpak/**"
+
+concurrency:
+  group: mirvdesk-fast-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  validate-config:
-    runs-on: ubuntu-latest
+  fast-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      MIRVDESK_SERVER_URL: ${{ vars.MIRVDESK_SERVER_URL }}
     steps:
-      - name: Require self-hosted MirvDesk server URL
-        shell: bash
-        env:
-          MIRVDESK_SERVER_URL: ${{ vars.MIRVDESK_SERVER_URL }}
-        run: |
-          set -euo pipefail
-          url="${MIRVDESK_SERVER_URL%/}"
-          if [[ -z "$url" ]]; then
-            echo "::error::MIRVDESK_SERVER_URL is required. Deploy your own MirvDesk Server and create this repository variable before building."
-            exit 1
-          fi
-          case "$url" in
-            http://*|https://*) ;;
-            *) echo "::error::MIRVDESK_SERVER_URL must start with http:// or https://"; exit 1 ;;
-          esac
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+          fetch-depth: 2
 
-  run-ci:
-    needs: validate-config
-    permissions:
-      contents: write
-    uses: ./.github/workflows/flutter-build.yml
-    secrets: inherit
-    with:
-      upload-artifact: false
+      - name: Validate self-hosted configuration
+        run: .github/scripts/validate-mirvdesk-config.sh
+
+      - name: Validate MirvDesk repository invariants
+        run: python3 .github/scripts/validate-mirvdesk-repo.py
+
+      - name: Validate changed patch whitespace
+        run: git show --check --format=fuller --no-ext-diff HEAD
+
+      - name: Validate shell scripts
+        shell: bash
+        run: |
+          for script in .github/scripts/*.sh; do
+            bash -n "$script"
+          done
+
+      - name: Validate workflow YAML
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check --quiet pyyaml
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+          for path in Path('.github/workflows').glob('*.yml'):
+              yaml.safe_load(path.read_text())
+              print(f'{path}: OK')
+          PY
+
+      - name: Install Rust metadata toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: "1.81"
+
+      - name: Validate Cargo graph and lockfile
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
