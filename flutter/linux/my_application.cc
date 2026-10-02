@@ -72,6 +72,21 @@ static void side_buttons_channel_destroy(gpointer data) {
   g_object_unref(data);
 }
 
+static void set_mirvdesk_window_icon(GtkWindow* window) {
+  if (window == NULL) return;
+
+  GtkIconTheme* theme = gtk_icon_theme_get_default();
+  const gint icon_sizes[] = {256, 128, 64, 32};
+  for (guint i = 0; i < G_N_ELEMENTS(icon_sizes); i++) {
+    GdkPixbuf* icon = gtk_icon_theme_load_icon(
+        theme, "mirvdesk", icon_sizes[i], GTK_ICON_LOOKUP_NO_SVG, NULL);
+    if (icon != NULL) {
+      gtk_window_set_icon(window, icon);
+      g_object_unref(icon);
+    }
+  }
+}
+
 static void side_buttons_init_for_window(GtkWindow* window, FlMethodChannel* channel) {
   // Guard against double-initialization (would leave dangling signal user_data).
   if (g_object_get_data(G_OBJECT(window), "side-buttons-channel") != NULL) return;
@@ -96,6 +111,8 @@ static void on_subwindow_created(FlPluginRegistry* registry) {
   FlView* view = FL_VIEW(registry);
   GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
   if (toplevel != NULL && GTK_IS_WINDOW(toplevel)) {
+    set_mirvdesk_window_icon(GTK_WINDOW(toplevel));
+
     FlMethodChannel* channel = side_buttons_create_channel(fl_view_get_engine(view));
     if (channel == NULL) return;
     side_buttons_init_for_window(GTK_WINDOW(toplevel), channel);
@@ -112,15 +129,7 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   gtk_window_set_decorated(window, FALSE);
-  // try setting icon for rustdesk, which uses the system cache
-  GtkIconTheme* theme = gtk_icon_theme_get_default();
-  gint icons[4] = {256, 128, 64, 32};
-  for (int i = 0; i < 4; i++) {
-    GdkPixbuf* icon = gtk_icon_theme_load_icon(theme, "mirvdesk", icons[i], GTK_ICON_LOOKUP_NO_SVG, NULL);
-    if (icon != nullptr) {
-      gtk_window_set_icon(window, icon);
-    }
-  }
+  set_mirvdesk_window_icon(window);
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
   // desktop).
@@ -171,9 +180,10 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_show(GTK_WIDGET(view));
 
   // Register callback for sub-windows created by desktop_multi_window plugin.
-  // Handles both Wayland shortcuts inhibition (guarded inside) and side button
-  // forwarding. Safe to call on X11-only builds - the plugin just stores the
-  // callback pointer regardless of windowing system.
+  // Applies the MirvDesk window icon, handles Wayland shortcuts inhibition
+  // (guarded inside), and forwards side mouse buttons. Safe to call on X11-only
+  // builds - the plugin just stores the callback pointer regardless of windowing
+  // system.
   desktop_multi_window_plugin_set_window_created_callback(
       (WindowCreatedCallback)on_subwindow_created);
 
