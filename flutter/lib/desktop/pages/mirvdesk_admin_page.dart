@@ -165,8 +165,9 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     String title,
     String label, {
     bool password = false,
+    String initialValue = '',
   }) async {
-    final controller = TextEditingController();
+    final controller = TextEditingController(text: initialValue);
     try {
       return await showDialog<String>(
         context: context,
@@ -590,6 +591,28 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     ],
   );
 
+  Future<void> _editDeviceNote(Map<String, dynamic> device) async {
+    final id = (device['id'] ?? '').toString();
+    final updated = await _prompt(
+      'Note for $id',
+      'Manager note',
+      initialValue: (device['note'] ?? '').toString(),
+    );
+    if (updated == null) return;
+    if (updated.length > 1000) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Note must be 1000 characters or less')),
+      );
+      return;
+    }
+    await _mutation(
+      'PUT',
+      '/api/admin/devices/' + Uri.encodeComponent(id) + '/note',
+      {'note': updated},
+    );
+  }
+
   Widget _deviceList() => ListView.builder(
     itemCount: devices.length,
     itemBuilder: (context, i) {
@@ -597,17 +620,38 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       final names = device['device_group_names'] is List
           ? (device['device_group_names'] as List).join(', ')
           : (device['device_group_name'] ?? '').toString();
+      final note = (device['note'] ?? '').toString();
+      final seconds = device['last_account_login'];
+      final lastLogin = seconds is int && seconds > 0
+          ? DateTime.fromMillisecondsSinceEpoch(seconds * 1000)
+                .toLocal()
+                .toString()
+                .substring(0, 16)
+          : '';
       return ListTile(
         leading: const Icon(Icons.desktop_windows_outlined),
         title: Text((device['id'] ?? '').toString()),
         subtitle: Text(
           'Owner: ' +
               (device['user_name'] ?? '').toString() +
-              (names.isEmpty ? '' : ' · ' + names),
+              (names.isEmpty ? '' : ' · ' + names) +
+              (note.isEmpty ? '' : '\n' + note) +
+              (lastLogin.isEmpty ? '' : '\nLast account login: ' + lastLogin),
         ),
-        trailing: OutlinedButton(
-          onPressed: () => _editDeviceGroups(device),
-          child: const Text('Edit groups'),
+        isThreeLine: note.isNotEmpty || lastLogin.isNotEmpty,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Edit device note',
+              icon: const Icon(Icons.edit_note_outlined),
+              onPressed: () => _editDeviceNote(device),
+            ),
+            OutlinedButton(
+              onPressed: () => _editDeviceGroups(device),
+              child: const Text('Edit groups'),
+            ),
+          ],
         ),
       );
     },
