@@ -161,7 +161,11 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     }
   }
 
-  Future<String?> _prompt(String title, String label) async {
+  Future<String?> _prompt(
+    String title,
+    String label, {
+    bool password = false,
+  }) async {
     final controller = TextEditingController();
     try {
       return await showDialog<String>(
@@ -171,9 +175,11 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
           content: TextField(
             controller: controller,
             autofocus: true,
+            obscureText: password,
             decoration: InputDecoration(labelText: label),
             onSubmitted: (value) =>
-                Navigator.of(dialogContext).pop(value.trim()),
+                Navigator.of(dialogContext)
+                    .pop(password ? value : value.trim()),
           ),
           actions: [
             TextButton(
@@ -182,7 +188,8 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
             ),
             FilledButton(
               onPressed: () =>
-                  Navigator.of(dialogContext).pop(controller.text.trim()),
+                  Navigator.of(dialogContext)
+                      .pop(password ? controller.text : controller.text.trim()),
               child: const Text('Save'),
             ),
           ],
@@ -205,6 +212,132 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.toString())));
     }
+  }
+
+  Future<void> _createUser() async {
+    final username = TextEditingController();
+    final displayName = TextEditingController();
+    final password = TextEditingController();
+    try {
+      final result = await showDialog<Map<String, String>>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Create user'),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: username,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Username'),
+                ),
+                TextField(
+                  controller: displayName,
+                  decoration: const InputDecoration(labelText: 'Display name'),
+                ),
+                TextField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Initial password (at least 10 characters)',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text('New accounts are created as regular users.'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop({
+                'username': username.text.trim(),
+                'display_name': displayName.text.trim(),
+                'password': password.text,
+              }),
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      );
+      if (result == null) return;
+      if (result['username']!.length < 3 || result['password']!.length < 10) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Username: 3+ characters, password: 10+ characters'),
+          ),
+        );
+        return;
+      }
+      await _mutation('POST', '/api/admin/users', result);
+    } finally {
+      username.dispose();
+      displayName.dispose();
+      password.dispose();
+    }
+  }
+
+  Future<void> _changeUserStatus(Map<String, dynamic> user) async {
+    final name = (user['name'] ?? '').toString();
+    final enabled = user['status'] == 1;
+    if (enabled) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Disable $name?'),
+          content: const Text(
+            'The user will be logged out on every device. '
+            'This does not disconnect existing RustDesk transport sessions.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Disable'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    await _mutation(
+      'PATCH',
+      '/api/admin/users/' + Uri.encodeComponent(name) + '/status',
+      {'enabled': !enabled},
+    );
+  }
+
+  Future<void> _resetUserPassword(Map<String, dynamic> user) async {
+    final name = (user['name'] ?? '').toString();
+    final password = await _prompt(
+      'Reset password for $name',
+      'New password (at least 10 characters)',
+      password: true,
+    );
+    if (password == null) return;
+    if (password.length < 10) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password must be at least 10 characters'),
+        ),
+      );
+      return;
+    }
+    await _mutation(
+      'PUT',
+      '/api/admin/users/' + Uri.encodeComponent(name) + '/password',
+      {'password': password},
+    );
   }
 
   Future<void> _createGroup() async {
@@ -291,21 +424,75 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     );
   }
 
-  Widget _userList() => ListView.builder(
-    itemCount: users.length,
-    itemBuilder: (context, i) {
-      final user = users[i];
-      return ListTile(
-        leading: const Icon(Icons.person_outline),
-        title: Text((user['display_name'] ?? user['name'] ?? '').toString()),
-        subtitle: Text('@' + (user['name'] ?? '').toString()),
-        trailing: Text(
-          user['is_admin'] == true
-              ? 'Admin'
-              : (user['status'] == 1 ? 'Active' : 'Disabled'),
+  Widget _userList() => Column(
+    children: [
+      Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: FilledButton.icon(
+            icon: const Icon(Icons.person_add_alt_1),
+            label: const Text('Create user'),
+            onPressed: _createUser,
+          ),
         ),
-      );
-    },
+      ),
+      Expanded(
+        child: ListView.builder(
+          itemCount: users.length,
+          itemBuilder: (context, i) {
+            final user = users[i];
+            final name = (user['name'] ?? '').toString();
+            final isSelf =
+                name.toLowerCase() ==
+                gFFI.userModel.userName.value.toLowerCase();
+            return ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text((user['display_name'] ?? name).toString()),
+              subtitle: Text('@' + name),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    user['is_admin'] == true
+                        ? 'Admin'
+                        : (user['status'] == 1 ? 'Active' : 'Disabled'),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'User actions',
+                    onSelected: (action) {
+                      switch (action) {
+                        case 'status':
+                          _changeUserStatus(user);
+                          break;
+                        case 'password':
+                          _resetUserPassword(user);
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      if (!isSelf)
+                        PopupMenuItem(
+                          value: 'status',
+                          child: Text(
+                            user['status'] == 1
+                                ? 'Disable account'
+                                : 'Enable account',
+                          ),
+                        ),
+                      const PopupMenuItem(
+                        value: 'password',
+                        child: Text('Reset password'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    ],
   );
 
   Widget _groupList() => Column(
