@@ -40,6 +40,10 @@ jobs:
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
+            **1.6.2** corrects mobile network option retrieval without desktop
+            IPC on iOS and Android, and keeps the delayed relay attempt alive
+            even when direct P2P fails before the fallback timer expires.
+
             **1.6.1** hedges stalled P2P attempts by starting hbbr relay setup
             after a short head start, without cancelling the direct attempt.
             Android discovery now happens before NAT probes, and release CI
