@@ -49,6 +49,11 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
         crate::read_custom_client(custom_client_config);
     }
     crate::common::init_mirvdesk_branding();
+    // Configure bundled self-hosted endpoints BEFORE NAT/rendezvous probes.
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = crate::common::global_init();
+    }
     #[cfg(target_os = "android")]
     {
         // flexi_logger can't work when android_logger initialized.
@@ -70,10 +75,6 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
         use hbb_common::env_logger::*;
         init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "debug"));
         crate::common::test_nat_type();
-    }
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    {
-        let _ = crate::common::global_init();
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
