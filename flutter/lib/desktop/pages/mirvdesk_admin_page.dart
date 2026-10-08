@@ -36,6 +36,7 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
   List<Map<String, dynamic>> users = [];
   List<Map<String, dynamic>> groups = [];
   List<Map<String, dynamic>> devices = [];
+  List<Map<String, dynamic>> audit = [];
 
   @override
   void initState() {
@@ -138,12 +139,14 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
         _fetchPaged('/api/admin/users'),
         _fetchPaged('/api/admin/groups'),
         _fetchPaged('/api/admin/devices'),
+        _fetchPaged('/api/admin/audit'),
       ]);
       if (!mounted) return;
       setState(() {
         users = result[0];
         groups = result[1];
         devices = result[2];
+        audit = result[3];
       });
     } catch (e) {
       if (!mounted) return;
@@ -370,9 +373,34 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     },
   );
 
+  Widget _auditList() => ListView.builder(
+    itemCount: audit.length,
+    itemBuilder: (context, i) {
+      final entry = audit[i];
+      final seconds = entry['created_at'] is int
+          ? entry['created_at'] as int
+          : 0;
+      final time = seconds > 0
+          ? DateTime.fromMillisecondsSinceEpoch(seconds * 1000).toLocal()
+          : null;
+      return ListTile(
+        leading: const Icon(Icons.history_outlined),
+        title: Text((entry['action'] ?? '').toString()),
+        subtitle: Text(
+          (entry['actor'] ?? '').toString() +
+              ' · ' +
+              (entry['target_type'] ?? '').toString() +
+              ': ' +
+              (entry['target_id'] ?? '').toString(),
+        ),
+        trailing: time == null ? null : Text(time.toString().substring(0, 16)),
+      );
+    },
+  );
+
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 3,
+    length: 4,
     child: Scaffold(
       appBar: AppBar(
         title: const Text('MirvDesk administration'),
@@ -388,6 +416,7 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
             Tab(icon: Icon(Icons.people_outline), text: 'Users'),
             Tab(icon: Icon(Icons.folder_outlined), text: 'Groups'),
             Tab(icon: Icon(Icons.computer_outlined), text: 'Devices'),
+            Tab(icon: Icon(Icons.history_outlined), text: 'Audit'),
           ],
         ),
       ),
@@ -407,7 +436,14 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
                 ],
               ),
             )
-          : TabBarView(children: [_userList(), _groupList(), _deviceList()]),
+          : TabBarView(
+              children: [
+                _userList(),
+                _groupList(),
+                _deviceList(),
+                _auditList(),
+              ],
+            ),
     ),
   );
 }
