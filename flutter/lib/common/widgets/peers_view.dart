@@ -576,15 +576,22 @@ class MyGroupPeerView extends BasePeersView {
           (user.name.toLowerCase().contains(text) ||
               user.displayNameOrName.toLowerCase().contains(text)));
       final searchPeersOfDeviceGroup =
-          peer.device_group_name.toLowerCase().contains(text) &&
-              model.deviceGroups.any((g) => g.name == peer.device_group_name);
+          peer.device_group_names.any((name) =>
+              name.toLowerCase().contains(text) &&
+              model.deviceGroups.any((g) => g.name == name)) ||
+          (peer.device_group_names.isEmpty &&
+              peer.device_group_name.toLowerCase().contains(text) &&
+              model.deviceGroups.any((g) => g.name == peer.device_group_name));
       if (!searchPeersOfUser && !searchPeersOfDeviceGroup) {
         return false;
       }
     }
     if (model.selectedAccessibleItemName.isNotEmpty) {
       if (model.isSelectedDeviceGroup.value) {
-        if (model.selectedAccessibleItemName.value != peer.device_group_name) {
+        final selected = model.selectedAccessibleItemName.value;
+        if (!peer.device_group_names.contains(selected) &&
+            !(peer.device_group_names.isEmpty &&
+                selected == peer.device_group_name)) {
           return false;
         }
       } else {
