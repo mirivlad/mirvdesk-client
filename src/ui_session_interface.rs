@@ -1977,6 +1977,11 @@ pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let (sender, mut receiver) = mpsc::unbounded_channel::<Data>();
     *handler.sender.write().unwrap() = Some(sender.clone());
+    // Mobile platforms keep their self-host bootstrap config in-process.
+    // The IPC service does not exist on iOS and need not be queried on Android.
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let network_options = Config::get_options();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let network_options = crate::ipc::get_options_async().await;
     let api_auth_only = is_mirvdesk_api_auth_only(&network_options);
     let token = if api_auth_only {
