@@ -15,6 +15,22 @@ if [[ -z "$url" ]]; then
 fi
 
 case "$artifact" in
+  *.apk)
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' EXIT
+    mapfile -t native_libs < <(unzip -Z1 "$artifact" | grep -E '^lib/[^/]+/librustdesk[.]so$')
+    if (( ${#native_libs[@]} == 0 )); then
+      echo "::error::$artifact does not contain a RustDesk native library"
+      exit 1
+    fi
+    for lib in "${native_libs[@]}"; do
+      unzip -p "$artifact" "$lib" > "$tmp/core.so"
+      if ! LC_ALL=C grep -aFq -- "$url" "$tmp/core.so"; then
+        echo "::error::$artifact $lib lacks configured bootstrap URL"
+        exit 1
+      fi
+    done
+    ;;
   *.deb)
     tmp="$(mktemp -d)"
     trap 'rm -rf "$tmp"' EXIT

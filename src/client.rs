@@ -318,6 +318,35 @@ async fn race_transports_prefer_webrtc<'a, T: 'a>(
     }
 }
 
+/// Hedge a slow P2P attempt with a relay. Direct transport stays live.
+async fn race_direct_with_delayed_relay<T>(
+    direct: impl std::future::Future<Output = ResultType<T>>,
+    relay: impl std::future::Future<Output = ResultType<T>>,
+    delay: Duration,
+) -> ResultType<T> {
+    tokio::pin!(direct);
+    let delayed_relay = async {
+        tokio::time::sleep(delay).await;
+        relay.await
+    };
+    tokio::pin!(delayed_relay);
+    tokio::select! {
+        result = &mut direct => result,
+        result = &mut delayed_relay => match result {
+            Ok(relayed) => {
+                match tokio::time::timeout(Duration::from_millis(200), &mut direct).await {
+                    Ok(Ok(p2p)) => Ok(p2p),
+                    _ => Ok(relayed),
+                }
+            }
+            Err(err) => {
+                log::warn!("hedged relay failed; continuing direct attempt: {err}");
+                direct.await
+            }
+        }
+    }
+}
+
 // A peer decides how many ICE candidates it sends, and the rendezvous route that carries them is
 // reachable without a prior punch, so these sites would otherwise let someone else set how much
 // this machine writes to its log file. One line a minute each, carrying the suppressed count.
@@ -1457,19 +1486,43 @@ impl Client {
         // Prefer P2P: a direct result wins outright, a relayed WebRTC (TURN) is held for the
         // window so a direct punch can still land. Falls back to plain select_ok when only one
         // kind is present.
-        let direct_result = match (webrtc_fut, direct_futures.is_empty()) {
-            (Some(webrtc_fut), false) => {
-                race_transports_prefer_webrtc(
-                    webrtc_fut,
-                    direct_futures,
-                    Self::WEBRTC_PREFER_WINDOW_MS,
-                    |r| r.3,
-                )
-                .await
+        let direct_attempt = async {
+            match (webrtc_fut, direct_futures.is_empty()) {
+                (Some(webrtc_fut), false) => {
+                    race_transports_prefer_webrtc(
+                        webrtc_fut,
+                        direct_futures,
+                        Self::WEBRTC_PREFER_WINDOW_MS,
+                        |r| r.3,
+                    )
+                    .await
+                }
+                (Some(webrtc_fut), true) => webrtc_fut.await,
+                (None, false) => select_ok(direct_futures).await.map(|c| c.0),
+                (None, true) => Err(anyhow!("No direct transport available")),
             }
-            (Some(webrtc_fut), true) => webrtc_fut.await,
-            (None, false) => select_ok(direct_futures).await.map(|c| c.0),
-            (None, true) => Err(anyhow!("No direct transport available")),
+        };
+        // Do not serially spend CONNECT_TIMEOUT on a dropped TCP punch.
+        // Start hbbr after a short head-start, keeping direct P2P in flight.
+        let direct_result = if !relay_server.is_empty()
+            && !is_local
+            && !interface.is_force_relay()
+            && !interface.is_policy_relay()
+        {
+            let delay_ms = if direct_failures > 0 { 1200 } else { 2500 };
+            let switch_code = interface.get_switch_code();
+            let relay_attempt = async {
+                let stream = Self::request_relay(
+                    peer_id, relay_server.to_owned(), rendezvous_server,
+                    !signed_id_pk.is_empty(), key, token, conn_type, &switch_code,
+                ).await?;
+                Ok((stream, None, "Relay", false))
+            };
+            race_direct_with_delayed_relay(
+                direct_attempt, relay_attempt, Duration::from_millis(delay_ms)
+            ).await
+        } else {
+            direct_attempt.await
         };
         let (mut conn, kcp, mut typ, mut direct) = match direct_result {
             Ok((conn, kcp, typ, direct)) => (Ok(conn), kcp, typ, direct),
@@ -5169,6 +5222,45 @@ pub mod peer_online {
     #[cfg(test)]
     mod tests {
         use crate::client::Client;
+        use std::time::Duration;
+        use hbb_common::anyhow::{anyhow, Error};
+
+        #[tokio::test]
+        async fn hedge_fast_direct_wins() {
+            let got = crate::client::race_direct_with_delayed_relay(
+                async { Ok::<_, Error>("direct") },
+                async { Ok::<_, Error>("relay") },
+                Duration::from_millis(50),
+            ).await.unwrap();
+            assert_eq!(got, "direct");
+        }
+
+        #[tokio::test]
+        async fn hedge_relay_wins_stalled_direct() {
+            let got = crate::client::race_direct_with_delayed_relay(
+                async {
+                    tokio::time::sleep(Duration::from_secs(10)).await;
+                    Ok::<_, Error>("direct")
+                },
+                async { Ok::<_, Error>("relay") },
+                Duration::from_millis(10),
+            ).await.unwrap();
+            assert_eq!(got, "relay");
+        }
+
+        #[tokio::test]
+        async fn hedge_failed_relay_keeps_direct() {
+            let got = crate::client::race_direct_with_delayed_relay(
+                async {
+                    tokio::time::sleep(Duration::from_millis(40)).await;
+                    Ok::<_, Error>("direct")
+                },
+                async { Err::<&str, _>(anyhow!("relay down")) },
+                Duration::from_millis(10),
+            ).await.unwrap();
+            assert_eq!(got, "direct");
+        }
+
         use hbb_common::rendezvous_proto::IceCandidate;
         use hbb_common::tokio;
 

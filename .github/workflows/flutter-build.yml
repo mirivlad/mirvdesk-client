@@ -51,7 +51,7 @@ env:
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
   VCPKG_CMAKE_VERSION: "4.3.0"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
-  VERSION: "1.6.0"
+  VERSION: "1.6.1"
   NDK_VERSION: "r28c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
@@ -1237,6 +1237,19 @@ jobs:
           mkdir -p signed-apk; pushd signed-apk
           mv ../mirvdesk-${{ env.VERSION }}-${{ matrix.job.arch }}${{ matrix.job.suffix }}.apk .
 
+      - name: Verify self-hosted bootstrap in Android APK
+        shell: bash
+        run: |
+          shopt -s nullglob
+          apks=(signed-apk/mirvdesk-*.apk)
+          if (( ${#apks[@]} == 0 )); then
+            echo "::error::No Android APK found for bootstrap validation"
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            .github/scripts/verify-mirvdesk-bootstrap.sh "$apk"
+          done
+
       # https://github.com/r0adkll/sign-android-release/issues/84#issuecomment-1889636075
       - name: Setup sign tool version variable
         shell: bash
@@ -1421,6 +1434,19 @@ jobs:
           popd
           mkdir -p signed-apk
           mv ./flutter/build/app/outputs/flutter-apk/app-${{ env.reltype }}.apk signed-apk/mirvdesk-${{ env.VERSION }}-universal${{ env.suffix }}.apk
+
+      - name: Verify self-hosted bootstrap in Android APK
+        shell: bash
+        run: |
+          shopt -s nullglob
+          apks=(signed-apk/mirvdesk-*.apk)
+          if (( ${#apks[@]} == 0 )); then
+            echo "::error::No Android APK found for bootstrap validation"
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            .github/scripts/verify-mirvdesk-bootstrap.sh "$apk"
+          done
 
       # https://github.com/r0adkll/sign-android-release/issues/84#issuecomment-1889636075
       - name: Setup sign tool version variable
