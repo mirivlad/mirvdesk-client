@@ -15,13 +15,15 @@ class MirvDeskAdminPage extends StatefulWidget {
 
   static void open() {
     final tabs = Get.find<DesktopTabController>();
-    tabs.add(TabInfo(
-      key: 'mirvdesk-admin',
-      label: 'Administration',
-      selectedIcon: Icons.admin_panel_settings,
-      unselectedIcon: Icons.admin_panel_settings_outlined,
-      page: const MirvDeskAdminPage(key: ValueKey('mirvdesk-admin')),
-    ));
+    tabs.add(
+      TabInfo(
+        key: 'mirvdesk-admin',
+        label: 'Administration',
+        selectedIcon: Icons.admin_panel_settings,
+        unselectedIcon: Icons.admin_panel_settings_outlined,
+        page: const MirvDeskAdminPage(key: ValueKey('mirvdesk-admin')),
+      ),
+    );
   }
 
   @override
@@ -43,7 +45,9 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
 
   Future<Uri> _endpoint(String path) async {
     final base = (await bind.mainGetApiServer()).trim().replaceFirst(
-        RegExp(r'/$'), '');
+      RegExp(r'/$'),
+      '',
+    );
     if (base.isEmpty) {
       throw StateError('MirvDesk Server is not configured');
     }
@@ -59,10 +63,18 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
         response = await http.get(uri, headers: headers);
         break;
       case 'POST':
-        response = await http.post(uri, headers: headers, body: jsonEncode(body));
+        response = await http.post(
+          uri,
+          headers: headers,
+          body: jsonEncode(body),
+        );
         break;
       case 'PUT':
-        response = await http.put(uri, headers: headers, body: jsonEncode(body));
+        response = await http.put(
+          uri,
+          headers: headers,
+          body: jsonEncode(body),
+        );
         break;
       case 'DELETE':
         response = await http.delete(uri, headers: headers);
@@ -73,10 +85,14 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     final decoded = jsonDecode(decode_http_response(response));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 404) {
-        throw StateError('Administrator API unavailable. Upgrade MirvDesk Server to 1.7.');
+        throw StateError(
+          'Administrator API unavailable. Upgrade MirvDesk Server to 1.7.',
+        );
       }
       final message = decoded is Map ? decoded['error'] : null;
-      throw StateError(message?.toString() ?? 'HTTP ' + response.statusCode.toString());
+      throw StateError(
+        message?.toString() ?? 'HTTP ' + response.statusCode.toString(),
+      );
     }
     return decoded;
   }
@@ -85,8 +101,14 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     final items = <Map<String, dynamic>>[];
     const perPage = 500;
     for (var current = 1; current <= 20; current++) {
-      final page = await _request('GET', path + '?current=' +
-          current.toString() + '&pageSize=' + perPage.toString());
+      final page = await _request(
+        'GET',
+        path +
+            '?current=' +
+            current.toString() +
+            '&pageSize=' +
+            perPage.toString(),
+      );
       if (page is! Map || page['data'] is! List) {
         throw const FormatException('Invalid MirvDesk admin response');
       }
@@ -101,10 +123,16 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
 
   Future<void> _reload() async {
     if (!gFFI.userModel.isAdmin.value) {
-      setState(() { error = 'Administrator account required'; loading = false; });
+      setState(() {
+        error = 'Administrator account required';
+        loading = false;
+      });
       return;
     }
-    setState(() { loading = true; error = null; });
+    setState(() {
+      loading = true;
+      error = null;
+    });
     try {
       final result = await Future.wait([
         _fetchPaged('/api/admin/users'),
@@ -119,9 +147,14 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { error = e.toString(); });
+      setState(() {
+        error = e.toString();
+      });
     } finally {
-      if (mounted) setState(() { loading = false; });
+      if (mounted)
+        setState(() {
+          loading = false;
+        });
     }
   }
 
@@ -136,7 +169,8 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
             controller: controller,
             autofocus: true,
             decoration: InputDecoration(labelText: label),
-            onSubmitted: (value) => Navigator.of(dialogContext).pop(value.trim()),
+            onSubmitted: (value) =>
+                Navigator.of(dialogContext).pop(value.trim()),
           ),
           actions: [
             TextButton(
@@ -144,7 +178,8 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(controller.text.trim()),
               child: const Text('Save'),
             ),
           ],
@@ -160,14 +195,12 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       await _request(method, path, body);
       await _reload();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Saved')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -181,7 +214,9 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     final id = (device['id'] ?? '').toString();
     final selected = <String>{};
     if (device['device_group_names'] is List) {
-      selected.addAll((device['device_group_names'] as List).whereType<String>());
+      selected.addAll(
+        (device['device_group_names'] as List).whereType<String>(),
+      );
     } else if ((device['device_group_name'] ?? '').toString().isNotEmpty) {
       selected.add(device['device_group_name'].toString());
     }
@@ -219,7 +254,8 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(selected.toList()),
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(selected.toList()),
               child: const Text('Save'),
             ),
           ],
@@ -227,18 +263,29 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       ),
     );
     if (result == null) return;
-    await _mutation('PUT', '/api/admin/devices/' + Uri.encodeComponent(id) +
-        '/groups', {'groups': result});
+    await _mutation(
+      'PUT',
+      '/api/admin/devices/' + Uri.encodeComponent(id) + '/groups',
+      {'groups': result},
+    );
   }
 
   Future<void> _changeMember(String groupName, bool add) async {
     final username = await _prompt(
-        add ? 'Add user to group' : 'Remove user from group', 'Username');
+      add ? 'Add user to group' : 'Remove user from group',
+      'Username',
+    );
     if (username == null || username.isEmpty) return;
-    final path = '/api/admin/groups/' + Uri.encodeComponent(groupName) +
-        '/members' + (add ? '' : '/' + Uri.encodeComponent(username));
-    await _mutation(add ? 'POST' : 'DELETE', path,
-        add ? {'username': username} : null);
+    final path =
+        '/api/admin/groups/' +
+        Uri.encodeComponent(groupName) +
+        '/members' +
+        (add ? '' : '/' + Uri.encodeComponent(username));
+    await _mutation(
+      add ? 'POST' : 'DELETE',
+      path,
+      add ? {'username': username} : null,
+    );
   }
 
   Widget _userList() => ListView.builder(
@@ -249,8 +296,11 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
         leading: const Icon(Icons.person_outline),
         title: Text((user['display_name'] ?? user['name'] ?? '').toString()),
         subtitle: Text('@' + (user['name'] ?? '').toString()),
-        trailing: Text(user['is_admin'] == true ? 'Admin' :
-            (user['status'] == 1 ? 'Active' : 'Disabled')),
+        trailing: Text(
+          user['is_admin'] == true
+              ? 'Admin'
+              : (user['status'] == 1 ? 'Active' : 'Disabled'),
+        ),
       );
     },
   );
@@ -307,8 +357,11 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       return ListTile(
         leading: const Icon(Icons.desktop_windows_outlined),
         title: Text((device['id'] ?? '').toString()),
-        subtitle: Text('Owner: ' + (device['user_name'] ?? '').toString() +
-            (names.isEmpty ? '' : ' · ' + names)),
+        subtitle: Text(
+          'Owner: ' +
+              (device['user_name'] ?? '').toString() +
+              (names.isEmpty ? '' : ' · ' + names),
+        ),
         trailing: OutlinedButton(
           onPressed: () => _editDeviceGroups(device),
           child: const Text('Edit groups'),
@@ -330,26 +383,31 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
             onPressed: loading ? null : _reload,
           ),
         ],
-        bottom: const TabBar(tabs: [
-          Tab(icon: Icon(Icons.people_outline), text: 'Users'),
-          Tab(icon: Icon(Icons.folder_outlined), text: 'Groups'),
-          Tab(icon: Icon(Icons.computer_outlined), text: 'Devices'),
-        ]),
+        bottom: const TabBar(
+          tabs: [
+            Tab(icon: Icon(Icons.people_outline), text: 'Users'),
+            Tab(icon: Icon(Icons.folder_outlined), text: 'Groups'),
+            Tab(icon: Icon(Icons.computer_outlined), text: 'Devices'),
+          ],
+        ),
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(error!, textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    OutlinedButton(onPressed: _reload, child: const Text('Retry')),
-                  ],
-                ))
-              : TabBarView(children: [
-                  _userList(), _groupList(), _deviceList(),
-                ]),
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: _reload,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          : TabBarView(children: [_userList(), _groupList(), _deviceList()]),
     ),
   );
 }
