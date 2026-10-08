@@ -424,6 +424,39 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     );
   }
 
+  Future<void> _renameGroup(String name) async {
+    final updated = await _prompt('Rename group $name', 'New name');
+    if (updated == null || updated.isEmpty || updated == name) return;
+    await _mutation('PUT', '/api/admin/groups/' + Uri.encodeComponent(name), {
+      'name': updated,
+    });
+  }
+
+  Future<void> _deleteGroup(String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Delete group $name?'),
+        content: const Text(
+          'All group memberships will be removed. Devices will remain '
+          'registered, and other group assignments will be preserved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _mutation('DELETE', '/api/admin/groups/' + Uri.encodeComponent(name));
+  }
+
   Widget _userList() => Column(
     children: [
       Align(
@@ -527,6 +560,26 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
                   TextButton(
                     onPressed: () => _changeMember(name, false),
                     child: const Text('Remove member'),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Group actions',
+                    onSelected: (action) {
+                      if (action == 'rename') {
+                        _renameGroup(name);
+                      } else if (action == 'delete') {
+                        _deleteGroup(name);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'rename',
+                        child: Text('Rename group'),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete group'),
+                      ),
+                    ],
                   ),
                 ],
               ),
