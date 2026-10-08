@@ -1,1 +1,4 @@
 * text=auto
+
+# Upstream context diffs contain significant blank context lines.
+appimage/apprun-split-arguments.patch -whitespace
