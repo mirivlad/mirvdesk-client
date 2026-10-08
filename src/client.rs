@@ -318,7 +318,8 @@ async fn race_transports_prefer_webrtc<'a, T: 'a>(
     }
 }
 
-/// Hedge a slow P2P attempt with a relay. Direct transport stays live.
+/// Hedge a slow P2P attempt with relay setup while keeping P2P preferred.
+/// An early P2P failure must not cancel a relay that has not yet started.
 async fn race_direct_with_delayed_relay<T>(
     direct: impl std::future::Future<Output = ResultType<T>>,
     relay: impl std::future::Future<Output = ResultType<T>>,
@@ -331,17 +332,28 @@ async fn race_direct_with_delayed_relay<T>(
     };
     tokio::pin!(delayed_relay);
     tokio::select! {
-        result = &mut direct => result,
+        result = &mut direct => match result {
+            Ok(p2p) => Ok(p2p),
+            Err(direct_err) => match delayed_relay.await {
+                Ok(relayed) => Ok(relayed),
+                Err(relay_err) => bail!(
+                    "Direct connection failed: {direct_err}; relay also failed: {relay_err}"
+                ),
+            }
+        },
         result = &mut delayed_relay => match result {
             Ok(relayed) => {
+                // Prefer a P2P link close to completion, without stalling relay.
                 match tokio::time::timeout(Duration::from_millis(200), &mut direct).await {
                     Ok(Ok(p2p)) => Ok(p2p),
                     _ => Ok(relayed),
                 }
             }
-            Err(err) => {
-                log::warn!("hedged relay failed; continuing direct attempt: {err}");
-                direct.await
+            Err(relay_err) => match direct.await {
+                Ok(p2p) => Ok(p2p),
+                Err(direct_err) => bail!(
+                    "Relay failed: {relay_err}; direct also failed: {direct_err}"
+                ),
             }
         }
     }
@@ -5246,6 +5258,27 @@ pub mod peer_online {
                 Duration::from_millis(10),
             ).await.unwrap();
             assert_eq!(got, "relay");
+        }
+
+        #[tokio::test]
+        async fn hedge_early_direct_error_still_attempts_relay() {
+            let got = crate::client::race_direct_with_delayed_relay(
+                async { Err::<&str, _>(anyhow!("tcp refused")) },
+                async { Ok::<_, Error>("relay") },
+                Duration::from_millis(15),
+            ).await.unwrap();
+            assert_eq!(got, "relay");
+        }
+
+        #[tokio::test]
+        async fn hedge_both_paths_fail_reports_both_causes() {
+            let result = crate::client::race_direct_with_delayed_relay(
+                async { Err::<&str, _>(anyhow!("tcp refused")) },
+                async { Err::<&str, _>(anyhow!("relay down")) },
+                Duration::from_millis(5),
+            ).await;
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains("tcp refused") && err.contains("relay down"));
         }
 
         #[tokio::test]
