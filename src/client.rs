@@ -961,6 +961,7 @@ impl Client {
                 my_addr,
                 peer
             );
+            let attempt_started = Instant::now();
             socket.send(&msg_out).await?;
             // below timeout should not bigger than hbbs's connection timeout.
             let attempt_deadline = Instant::now() + Duration::from_millis((i * 3000) as u64);
@@ -1273,6 +1274,10 @@ impl Client {
                     }
                 }
             }
+            log::warn!(
+                "MirvDesk connection timing: stage=rendezvous_attempt_no_reply attempt={} attempt_elapsed_ms={} total_elapsed_ms={}",
+                i, attempt_started.elapsed().as_millis(), start.elapsed().as_millis()
+            );
         }
         let mut webrtc_bridge_stop = None;
         let mut webrtc_for_connect = None;
@@ -1332,6 +1337,10 @@ impl Client {
             bail!("Failed to connect via rendezvous server");
         }
         let time_used = start.elapsed().as_millis() as u64;
+        log::info!(
+            "MirvDesk connection timing: stage=rendezvous_done elapsed_ms={} punch={}",
+            time_used, punch_type
+        );
         log::info!(
             "{} ms used to {} punch hole, relay_server: {}, {}",
             time_used,
@@ -1581,6 +1590,7 @@ impl Client {
             start.elapsed(),
             punch_type
         );
+        let secure_started = std::time::Instant::now();
         let res = Self::secure_connection(peer_id, signed_id_pk.clone(), key, &mut conn).await;
         let pk: Option<Vec<u8>> = match res {
             Ok(pk) => pk,
@@ -1648,6 +1658,10 @@ impl Client {
                 let _ = guard.into_inner();
             }
         }
+        log::info!(
+            "MirvDesk connection timing: stage=secure_ready transport={} security_elapsed_ms={} connect_total_ms={}",
+            typ, secure_started.elapsed().as_millis(), start.elapsed().as_millis()
+        );
         log::debug!("{} punch secure_connection ok", punch_type);
         Ok((conn, direct, pk, kcp, typ))
     }
