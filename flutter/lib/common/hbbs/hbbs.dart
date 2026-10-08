@@ -81,6 +81,7 @@ class PeerPayload {
   String user = '';
   String user_name = '';
   String? device_group_name;
+  List<String> device_group_names = [];
   String note = '';
 
   PeerPayload.fromJson(Map<String, dynamic> json)
@@ -90,6 +91,9 @@ class PeerPayload {
         user = json['user'] ?? '',
         user_name = json['user_name'] ?? '',
         device_group_name = json['device_group_name'] ?? '',
+        device_group_names = json['device_group_names'] is List
+            ? (json['device_group_names'] as List).whereType<String>().toList()
+            : [],
         note = json['note'] ?? '';
 
   static Peer toPeer(PeerPayload p) {
@@ -100,6 +104,7 @@ class PeerPayload {
       "platform": _platform(p.info['os']),
       "hostname": p.info['device_name'],
       "device_group_name": p.device_group_name,
+      "device_group_names": p.device_group_names,
       "note": p.note,
     });
   }
