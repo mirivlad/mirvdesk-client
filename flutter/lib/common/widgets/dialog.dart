@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
@@ -67,6 +68,13 @@ class RegexValidationRule extends ValidationRule {
   bool validate(String value) {
     return value.isNotEmpty ? value.contains(_regex) : false;
   }
+}
+
+String generateMirvDeskRandomId() {
+  final random = Random.secure();
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return 'M' +
+      List.generate(15, (_) => chars[random.nextInt(chars.length)]).join();
 }
 
 void changeIdDialog() {
@@ -149,6 +157,19 @@ void changeIdDialog() {
               });
             },
           ).workaroundFreezeLinuxMint(),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: isInProgress ? null : () {
+                final id = generateMirvDeskRandomId();
+                controller.text = id;
+                rxId.value = id;
+                setState(() { msg = ''; });
+              },
+              icon: const Icon(Icons.casino_outlined, size: 18),
+              label: Text(translate('Generate new ID')),
+            ),
+          ),
           const SizedBox(
             height: 8.0,
           ),

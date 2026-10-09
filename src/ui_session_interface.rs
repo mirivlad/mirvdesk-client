@@ -51,6 +51,28 @@ use crate::common::GrabState;
 use crate::keyboard;
 use crate::{client::Data, client::Interface};
 
+// OS account matching is separate from the MirvDesk address-book login.
+// Windows adds a session type prefix and may disambiguate with a SID suffix.
+fn windows_session_is_user(label: &str, requested: &str) -> bool {
+    let label = label.split(" (sid = ").next().unwrap_or(label);
+    let label = label.strip_suffix(" (running)").unwrap_or(label);
+    let account = label.rsplit(':').next().unwrap_or(label).trim();
+    let account = account.rsplit('\\').next().unwrap_or(account);
+    account.to_lowercase() == requested.to_lowercase()
+}
+
+#[cfg(test)]
+mod os_session_routing_tests {
+    use super::windows_session_is_user;
+    #[test]
+    fn matches_exact_accounts_not_substrings() {
+        assert!(windows_session_is_user("Console: vasya", "vasya"));
+        assert!(windows_session_is_user("RDP-Tcp#1: Vasya (sid = 7)", "vasya"));
+        assert!(windows_session_is_user("RDP: DOMAIN\\petya (running)", "petya"));
+        assert!(!windows_session_is_user("Console: vasya2", "vasya"));
+    }
+}
+
 const CHANGE_RESOLUTION_VALID_TIMEOUT_SECS: u64 = 15;
 
 #[derive(Clone, Default)]
@@ -1790,6 +1812,31 @@ impl<T: InvokeUiSession> Interface for Session<T> {
 
     fn handle_peer_info(&self, mut pi: PeerInfo) {
         log::debug!("handle_peer_info :{:?}", pi);
+        // A requested OS account must never silently fall through to a
+        // different desktop, including when the remote host is an old client.
+        let requested_user = self.lc.read().unwrap().target_os_user.clone();
+        if let Some(ref requested) = requested_user {
+            if pi.platform.eq_ignore_ascii_case("Windows") {
+                let matching: Vec<_> = pi.windows_sessions.sessions.iter()
+                    .filter(|s| windows_session_is_user(&s.name, requested)).collect();
+                let active_account = pi.username.rsplit('\\').next().unwrap_or(&pi.username);
+                if matching.is_empty() && !active_account.to_lowercase().eq(&requested.to_lowercase()) {
+                    self.msgbox("error", "Session not found",
+                        &format!("Windows user '{}' has no selectable desktop session on this host.", requested), "");
+                    return;
+                }
+            } else if pi.platform.eq_ignore_ascii_case("Linux") {
+                if pi.username != *requested {
+                    self.msgbox("error", "Session not found",
+                        &format!("Linux user '{}' is not the desktop currently served by this host.", requested), "");
+                    return;
+                }
+            } else {
+                self.msgbox("error", "Session not supported",
+                    "OS-user session selection is supported only on Windows and Linux.", "");
+                return;
+            }
+        }
         self.lc.write().unwrap().peer_info = Some(pi.clone());
         if pi.current_display as usize >= pi.displays.len() {
             pi.current_display = 0;
@@ -1860,16 +1907,32 @@ impl<T: InvokeUiSession> Interface for Session<T> {
             }
         }
         if !pi.windows_sessions.sessions.is_empty() {
-            let selected = self
-                .lc
-                .read()
-                .unwrap()
-                .selected_windows_session_id
-                .to_owned();
-            if selected == Some(pi.windows_sessions.current_sid) {
-                self.send_selected_session_id(pi.windows_sessions.current_sid.to_string());
+            if let Some(ref user) = requested_user {
+                let matching: Vec<WindowsSession> = pi.windows_sessions.sessions.iter()
+                    .filter(|s| windows_session_is_user(&s.name, user))
+                    .cloned()
+                    .collect();
+                if matching.len() == 1 {
+                    self.send_selected_session_id(matching[0].sid.to_string());
+                } else if !matching.is_empty() {
+                    self.set_multiple_windows_session(matching);
+                } else {
+                    // The target is already active, but it was not included in
+                    // the multi-session listing (e.g. console pre-login).
+                    self.send_selected_session_id(pi.windows_sessions.current_sid.to_string());
+                }
             } else {
-                self.set_multiple_windows_session(pi.windows_sessions.sessions.clone());
+                let selected = self
+                    .lc
+                    .read()
+                    .unwrap()
+                    .selected_windows_session_id
+                    .to_owned();
+                if selected == Some(pi.windows_sessions.current_sid) {
+                    self.send_selected_session_id(pi.windows_sessions.current_sid.to_string());
+                } else {
+                    self.set_multiple_windows_session(pi.windows_sessions.sessions.clone());
+                }
             }
         }
     }

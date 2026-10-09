@@ -1796,6 +1796,22 @@ impl Connection {
         #[allow(unused_mut)]
         let mut username = crate::platform::get_active_username();
         let mut res = LoginResponse::new();
+        // The Linux root service currently serves the active seat0 desktop,
+        // not arbitrary concurrent logind sessions. Never quietly send a
+        // different user's screen for an explicitly targeted connection.
+        #[cfg(target_os = "linux")]
+        if self.is_remote() && !self.lr.os_login.username.is_empty()
+            && self.lr.os_login.username != username
+        {
+            res.set_error(format!(
+                "Linux session '{}' is not served by the active desktop (currently '{}').",
+                self.lr.os_login.username, username,
+            ));
+            let mut msg = Message::new();
+            msg.set_login_response(res);
+            self.send(msg).await;
+            return true;
+        }
         let mut pi = PeerInfo {
             username: username.clone(),
             version: VERSION.to_owned(),
@@ -2578,6 +2594,9 @@ impl Connection {
             hasher.update(bytes);
         };
         push(lr.my_id.as_bytes());
+        // Selecting a different OS session on an authentication retry must not
+        // bypass the controller/scope latch.
+        push(lr.os_login.username.as_bytes());
         // Payloads are destructured exhaustively: a new field fails to compile until it is
         // either latched here or deliberately ignored.
         match lr.union.as_ref() {
