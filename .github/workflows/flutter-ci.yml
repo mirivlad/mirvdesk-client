@@ -69,3 +69,8 @@ jobs:
 
       - name: Validate Cargo graph and lockfile
         run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Unit test Linux logind session parser
+        run: |
+          rustc --edition=2021 --test src/platform/linux_sessions.rs -o /tmp/mirvdesk-logind-unit-tests
+          /tmp/mirvdesk-logind-unit-tests

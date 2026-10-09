@@ -33,14 +33,27 @@ A target suffix matching that user works. A different user is explicitly
 rejected (including by the patched Linux host) rather than showing another
 user's desktop.
 
-**Parallel Linux sessions are not implemented yet.** Implementing them requires
-a root service that enumerates logind sessions and can route each authenticated
-remote connection to a stable per-session helper without killing or replacing
-the helpers for other sessions. Both X11 and Wayland need independent
-screen/input backends. For Wayland, capture/remote input must obey the session
-compositor and portal permissions; copying DISPLAY between processes is
-insufficient. Do not claim arbitrary-user Linux routing until that is in place
-and integration-tested on multi-seat/multi-session installations.
+**Parallel Linux sessions are not implemented yet.** The next-stage
+read-only session inventory lives in `src/platform/linux_sessions.rs`.
+It enumerates logind sessions (X11/Wayland, not SSH/TTY or greeters) and
+publishes a JSON-encoded list in `PeerInfo.platform_additions` as the scalar
+string `linux_logind_sessions_json` after normal RustDesk authorization.
+Each entry includes `id`, `username`, `type`, `seat`, `state`, `active`
+and provisional `served` information. The inventory cannot itself switch or
+grant a desktop session. Linux connections targeting a non-served OS account
+are now rejected *before* creating an authorized connection/audit record,
+and error messages distinguish a discovered graphical session from an
+account with no graphical session.
+
+The remaining work requires routing each authorized remote connection to
+a stable per-logind-session helper without killing or replacing the helpers
+for other sessions. The service currently owns shared IPC and rendezvous
+state, so spawning a second `--server` unchanged would conflict. Both
+X11 and Wayland need independent screen/input backends. For Wayland,
+capture/remote input must obey the compositor and portal permissions;
+copying DISPLAY between processes is insufficient. Do not claim
+arbitrary-user Linux routing until this is implemented and integration-
+tested on multi-seat/multi-session installations.
 
 The host target is carried as an OSLogin username-only hint in the existing
 RustDesk protocol message, with **no OS password**, to avoid changing the

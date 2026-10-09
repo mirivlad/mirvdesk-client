@@ -1,4 +1,7 @@
 use super::{gtk_sudo, CursorData, ResultType};
+#[path = "linux_sessions.rs"]
+mod linux_sessions;
+pub use linux_sessions::{list_graphical_sessions, GraphicalSession};
 use desktop::Desktop;
 pub use hbb_common::platform::linux::*;
 

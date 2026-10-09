@@ -1757,6 +1757,28 @@ impl Connection {
         if !self.connect_port_forward_if_needed().await {
             return false;
         }
+        #[cfg(target_os = "linux")]
+        if self.is_remote() && !self.lr.os_login.username.is_empty() {
+            // This connection's desktop belongs to the process owning the
+            // user --server. The root service currently launches only one
+            // instance for seat0; selecting another account must not switch
+            // the global service (which would hijack other connections).
+            let requested = &self.lr.os_login.username;
+            if crate::username() != *requested {
+                let target = requested.clone();
+                let listed = tokio::task::spawn_blocking(
+                    crate::platform::linux::list_graphical_sessions
+                ).await.unwrap_or_default();
+                let exists = listed.iter().any(|s| s.username == target);
+                let message = if exists {
+                    format!("Linux desktop for '{}' exists, but remote access to a different simultaneous graphical session is not yet supported.", target)
+                } else {
+                    format!("Linux graphical session for '{}' was not found on this host.", target)
+                };
+                self.send_login_error(message).await;
+                return false;
+            }
+        }
         self.authorized = true;
         // Releases the budget `check_id_whitelist` charges against this address: only a peer
         // that got this far proved more than a self-reported id.
@@ -1796,22 +1818,6 @@ impl Connection {
         #[allow(unused_mut)]
         let mut username = crate::platform::get_active_username();
         let mut res = LoginResponse::new();
-        // The Linux root service currently serves the active seat0 desktop,
-        // not arbitrary concurrent logind sessions. Never quietly send a
-        // different user's screen for an explicitly targeted connection.
-        #[cfg(target_os = "linux")]
-        if self.is_remote() && !self.lr.os_login.username.is_empty()
-            && self.lr.os_login.username != username
-        {
-            res.set_error(format!(
-                "Linux session '{}' is not served by the active desktop (currently '{}').",
-                self.lr.os_login.username, username,
-            ));
-            let mut msg = Message::new();
-            msg.set_login_response(res);
-            self.send(msg).await;
-            return true;
-        }
         let mut pi = PeerInfo {
             username: username.clone(),
             version: VERSION.to_owned(),
@@ -1840,6 +1846,28 @@ impl Connection {
         {
             if crate::platform::current_is_wayland() {
                 platform_additions.insert("is_wayland".into(), json!(true));
+            }
+            if self.is_remote() {
+                // This is inventory, NOT an authorization or session switch.
+                // PeerInfo.platform_additions permits only scalar JSON values,
+                // so transport the structured list as a JSON string.
+                let found = tokio::task::spawn_blocking(
+                    crate::platform::linux::list_graphical_sessions
+                ).await.unwrap_or_default();
+                let sessions: Vec<_> = found.iter().map(|s| json!({
+                    "id": s.id,
+                    "username": s.username,
+                    "type": s.kind,
+                    "seat": s.seat,
+                    "state": s.state,
+                    "active": s.active,
+                    "served": s.username == crate::username()
+                        && s.active && s.seat == "seat0",
+                })).collect();
+                platform_additions.insert(
+                    "linux_logind_sessions_json".into(),
+                    json!(serde_json::to_string(&sessions).unwrap_or_else(|_| "[]".to_owned())),
+                );
             }
         }
         #[cfg(target_os = "windows")]
