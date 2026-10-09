@@ -1,5 +1,10 @@
 use crate::{common::do_check_software_update, hbbs_http::create_http_client_with_url_strict};
+#[path = "mirvdesk_github_update.rs"]
+mod mirvdesk_github_update;
+pub use mirvdesk_github_update::github_release_update;
 use hbb_common::{bail, config, log, ResultType};
+#[cfg(target_os = "linux")]
+use hbb_common::tokio;
 use std::{
     io::Write,
     path::{Component, Path, PathBuf},
@@ -173,9 +178,14 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
 }
 
 fn check_update(manually: bool) -> ResultType<()> {
+    if crate::get_app_name() == "MirvDesk" {
+        #[cfg(target_os = "windows")]
+        return mirvdesk_github_update::update_windows_from_github();
+        #[cfg(not(target_os = "windows"))]
+        return Ok(()); // Linux uses a root-only verified .deb timer; macOS is not auto-enabled.
+    }
     if crate::is_custom_client() {
-        log::debug!("Stock RustDesk updater is disabled for {}", crate::get_app_name());
-        return Ok(());
+        return Ok(()); // Never update unrelated customized RustDesk builds.
     }
     // On macOS, auto-update is handled by check_update_as_root() in the service process.
     // The shared check_update() path is only used for manual update checks from the GUI.
@@ -657,6 +667,54 @@ pub fn check_update_as_root() -> ResultType<bool> {
         log::warn!("[root-update] Failed to remove temp dir {}: {}", private_tmp, e);
     }
     result.map(|_| true)
+}
+
+/// Root-only check for the package updater. Count incoming and controlling
+/// sessions in *every* running user --server, not merely the active seat0 user.
+/// Any unresponsive per-user IPC endpoint defers the update (fail closed).
+#[cfg(target_os = "linux")]
+#[tokio::main(flavor = "current_thread")]
+pub async fn linux_host_is_idle_for_update() -> bool {
+    use std::{collections::HashSet, os::unix::fs::MetadataExt};
+    if unsafe { hbb_common::libc::geteuid() } != 0 {
+        return false;
+    }
+    let mut uids = HashSet::new();
+    let Ok(processes) = std::fs::read_dir("/proc") else { return false };
+    for entry in processes.flatten() {
+        if entry.file_name().to_string_lossy().parse::<u32>().is_err() {
+            continue;
+        }
+        let path = entry.path();
+        let Ok(cmdline) = std::fs::read(path.join("cmdline")) else { continue };
+        let argv: Vec<&[u8]> = cmdline.split(|b| *b == 0).collect();
+        if argv.len() < 2 {
+            continue;
+        }
+        let binary = std::path::Path::new(std::str::from_utf8(argv[0]).unwrap_or(""))
+            .file_name().and_then(|s| s.to_str()).unwrap_or("");
+        if binary != "mirvdesk" && binary != "rustdesk" {
+            continue;
+        }
+        if argv[1] != b"--server" {
+            continue;
+        }
+        let Ok(metadata) = std::fs::metadata(&path) else { return false };
+        uids.insert(metadata.uid());
+    }
+    for uid in uids {
+        let Ok(mut channel) = crate::ipc::connect_for_uid(2000, uid, "").await else {
+            return false;
+        };
+        if channel.send(&crate::ipc::Data::HasNoActiveConns(None)).await.is_err() {
+            return false;
+        }
+        match channel.next_timeout(2000).await {
+            Ok(Some(crate::ipc::Data::HasNoActiveConns(Some(true)))) => {}
+            _ => return false,
+        }
+    }
+    true
 }
 
 #[cfg(test)]

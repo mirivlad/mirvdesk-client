@@ -1,0 +1,12 @@
+[Unit]
+Description=Check MirvDesk GitHub Releases for verified package updates
+
+[Timer]
+OnBootSec=30min
+OnUnitActiveSec=24h
+RandomizedDelaySec=30min
+Persistent=true
+Unit=mirvdesk-update.service
+
+[Install]
+WantedBy=timers.target

@@ -428,6 +428,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
+    // MirvDesk releases come from this fork, never from RustDesk's update URL.
+    // Platform updaters install after connections are idle; this is only a link.
+    if (bind.mainGetAppNameSync() == 'MirvDesk' &&
+        updateUrl.startsWith('https://github.com/mirivlad/mirvdesk-client/releases/tag/') &&
+        !isCardClosed) {
+      return buildInstallCard(
+          'Status',
+          'MirvDesk update available. It will install when remote sessions are idle.',
+          'Release notes',
+          () async => await launchUrl(Uri.parse(updateUrl)),
+          closeButton: true);
+    }
     if (!bind.isCustomClient() &&
         updateUrl.isNotEmpty &&
         !isCardClosed &&

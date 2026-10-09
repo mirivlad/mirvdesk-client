@@ -39,6 +39,31 @@ g_arpsystemcomponent = {
     },
 }
 
+def mirvdesk_msi_version(version):
+    """Keep X.Y.Z installer versions equal to normal MirvDesk versions.
+
+    The old 1.7.0-N previews had their own MSI mapping. We keep parsing
+    these historical tags only; future versions are plain major.minor.patch.
+    """
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-(\d+))?", version)
+    if not match:
+        raise ValueError(f"Invalid MirvDesk release version: {version!r}")
+    major, minor, patch, preview = match.groups()
+    major, minor, patch = int(major), int(minor), int(patch)
+    if major > 255 or minor > 255:
+        raise ValueError("MSI major/minor version out of range")
+    if preview is not None:
+        if (major, minor, patch) != (1, 7, 0):
+            raise ValueError("Only historical 1.7.0-N MSI previews are supported")
+        ordinal = int(preview)
+        if not 1 <= ordinal <= 98:
+            raise ValueError("MSI preview ordinal must be between 1 and 98")
+        patch = ordinal
+    if patch > 65535:
+        raise ValueError("MSI patch version out of range")
+    return f"{major}.{minor}.{patch}"
+
+
 def default_revision_version():
     return int(datetime.datetime.now().timestamp() / 60)
 
@@ -475,14 +500,16 @@ def init_global_vars(dist_dir, app_name, args):
 
     global g_version
     global g_build_date
-    g_version = args.version.replace("-", ".")
-    if g_version == "":
-        g_version = read_process_output("--version")
+    raw_version = args.version or read_process_output("--version")
+    if app_name == "MirvDesk":
+        g_version = mirvdesk_msi_version(raw_version)
+    else:
+        g_version = raw_version.replace("-", ".")
     version_pattern = re.compile(r"\d+\.\d+\.\d+.*")
     if not version_pattern.match(g_version):
         print(f"Error: version {g_version} not found in {dist_app}")
         return False
-    if g_version.count(".") == 2:
+    if app_name != "MirvDesk" and g_version.count(".") == 2:
         # https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/libraries/System.Private.CoreLib/src/System/Version.cs
         if args.revision_version < 0 or args.revision_version > 2147483647:
             raise ValueError(f"Invalid revision version: {args.revision_version}")    

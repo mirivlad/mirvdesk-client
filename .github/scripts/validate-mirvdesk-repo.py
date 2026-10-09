@@ -22,7 +22,14 @@ versions = {
     "flutter-build.yml": workflow.group(1) if workflow else None,
     "res/PKGBUILD": pkg.group(1) if pkg else None,
 }
-if None in versions.values() or len(set(versions.values())) != 1:
+if None in versions.values():
+    fail(f"MirvDesk version metadata is missing: {versions}")
+# From 1.7.1 releases use normal X.Y.Z everywhere.
+# Historical 1.7.0-N tags needed a base X.Y.Z in Flutter and Arch.
+base = versions["Cargo.toml"].split("-", 1)[0]
+if (versions["flutter-build.yml"] != versions["Cargo.toml"]
+        or versions["flutter/pubspec.yaml"] != base
+        or versions["res/PKGBUILD"] != base):
     fail(f"MirvDesk version metadata is inconsistent: {versions}")
 
 build_rs = read("build.rs")

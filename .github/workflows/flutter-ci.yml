@@ -70,6 +70,12 @@ jobs:
       - name: Validate Cargo graph and lockfile
         run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
+      - name: Validate GitHub release updater
+        run: |
+          python3 -m unittest discover -s tests -p test_mirvdesk_updater.py -v
+          python3 -m py_compile res/mirvdesk-update.py build.py
+          bash -n res/DEBIAN/postinst res/DEBIAN/prerm
+
       - name: Unit test Linux logind session parser
         run: |
           rustc --edition=2021 --test src/platform/linux_sessions.rs -o /tmp/mirvdesk-logind-unit-tests

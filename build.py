@@ -714,6 +714,8 @@ def build_flutter_deb(version, features):
         f'cp -r {flutter_build_dir}/* tmpdeb/usr/share/mirvdesk/')
     system2(
         'cp ../res/rustdesk.service tmpdeb/usr/share/mirvdesk/files/systemd/mirvdesk.service')
+    system2('cp ../res/mirvdesk-update.py tmpdeb/usr/share/mirvdesk/files/mirvdesk-update.py')
+    system2('cp ../res/mirvdesk-update.service ../res/mirvdesk-update.timer tmpdeb/usr/share/mirvdesk/files/systemd/')
     system2(
         'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/mirvdesk.png')
     system2(
@@ -825,6 +827,8 @@ def build_deb_from_folder(version, binary_folder, want_drm=False):
     system2('if [ -f tmpdeb/usr/share/mirvdesk/rustdesk ]; then mv tmpdeb/usr/share/mirvdesk/rustdesk tmpdeb/usr/share/mirvdesk/mirvdesk; fi')
     system2(
         'cp ../res/rustdesk.service tmpdeb/usr/share/mirvdesk/files/systemd/mirvdesk.service')
+    system2('cp ../res/mirvdesk-update.py tmpdeb/usr/share/mirvdesk/files/mirvdesk-update.py')
+    system2('cp ../res/mirvdesk-update.service ../res/mirvdesk-update.timer tmpdeb/usr/share/mirvdesk/files/systemd/')
     system2(
         'cp ../res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/mirvdesk.png')
     system2(
@@ -1119,6 +1123,8 @@ def main():
                 system2('mkdir -p tmpdeb/usr/share/icons/hicolor/scalable/apps/')
                 system2(
                     'cp res/rustdesk.service tmpdeb/usr/share/mirvdesk/files/systemd/mirvdesk.service')
+                system2('cp res/mirvdesk-update.py tmpdeb/usr/share/mirvdesk/files/mirvdesk-update.py')
+                system2('cp res/mirvdesk-update.service res/mirvdesk-update.timer tmpdeb/usr/share/mirvdesk/files/systemd/')
                 system2(
                     'cp res/128x128@2x.png tmpdeb/usr/share/icons/hicolor/256x256/apps/mirvdesk.png')
                 system2(

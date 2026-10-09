@@ -1127,6 +1127,11 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
 }
 
 pub fn check_software_update() {
+    // Branded MirvDesk checks its own GitHub releases, never api.rustdesk.com.
+    if get_app_name() == "MirvDesk" {
+        std::thread::spawn(move || allow_err!(do_check_software_update()));
+        return;
+    }
     if is_custom_client() {
         return;
     }
@@ -1140,6 +1145,33 @@ pub fn check_software_update() {
 // Because the url is always `https://api.rustdesk.com/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    if get_app_name() == "MirvDesk" {
+        // Mobile package updates require OS-specific installation consent.
+        // Never fall through to the upstream RustDesk update endpoint.
+        return Ok(());
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if get_app_name() == "MirvDesk" {
+        // reqwest::blocking must never run on a Tokio runtime worker.
+        let release = hbb_common::tokio::task::spawn_blocking(
+            crate::updater::github_release_update,
+        ).await??;
+        let response_url = release.map(|r| format!(
+            "https://github.com/mirivlad/mirvdesk-client/releases/tag/{}", r.tag
+        )).unwrap_or_default();
+        #[cfg(feature = "flutter")]
+        if !response_url.is_empty() {
+            let mut event = HashMap::new();
+            event.insert("name", "check_software_update_finish");
+            event.insert("url", response_url.as_str());
+            if let Ok(data) = serde_json::to_string(&event) {
+                let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+            }
+        }
+        *SOFTWARE_UPDATE_URL.lock().unwrap() = response_url;
+        return Ok(());
+    }
     let (request, url) =
         hbb_common::version_check_request(hbb_common::VER_TYPE_RUSTDESK_CLIENT.to_string());
     let proxy_conf = Config::get_socks();
