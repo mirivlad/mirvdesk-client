@@ -40,11 +40,10 @@ g_arpsystemcomponent = {
 }
 
 def mirvdesk_msi_version(version):
-    """Encode preview ordering in the three numeric fields WiX/MSI compares.
+    """Keep X.Y.Z installer versions equal to normal MirvDesk versions.
 
-    MirvDesk preview 1.7.0-3 -> MSI 1.7.3; stable 1.7.0 -> MSI 1.7.99.
-    1.7.1-1 -> 1.7.101 and stable 1.7.1 -> 1.7.199.
-    The release filename and application version remain 1.7.0-3.
+    The old 1.7.0-N previews had their own MSI mapping. We keep parsing
+    these historical tags only; future versions are plain major.minor.patch.
     """
     match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-(\d+))?", version)
     if not match:
@@ -53,19 +52,15 @@ def mirvdesk_msi_version(version):
     major, minor, patch = int(major), int(minor), int(patch)
     if major > 255 or minor > 255:
         raise ValueError("MSI major/minor version out of range")
-    # Preserve old versions, but start a deterministic monotonic scheme in 1.7.
-    if (major, minor) >= (1, 7):
-        if preview is None:
-            suffix = 99
-        else:
-            suffix = int(preview)
-            if not 1 <= suffix <= 98:
-                raise ValueError("MSI preview ordinal must be between 1 and 98")
-        patch = patch * 100 + suffix
-    elif preview is not None:
-        raise ValueError("Preview MSI versions before 1.7 are not supported")
+    if preview is not None:
+        if (major, minor, patch) != (1, 7, 0):
+            raise ValueError("Only historical 1.7.0-N MSI previews are supported")
+        ordinal = int(preview)
+        if not 1 <= ordinal <= 98:
+            raise ValueError("MSI preview ordinal must be between 1 and 98")
+        patch = ordinal
     if patch > 65535:
-        raise ValueError("MSI third version field out of range")
+        raise ValueError("MSI patch version out of range")
     return f"{major}.{minor}.{patch}"
 
 

@@ -41,18 +41,19 @@ jobs:
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
-            **1.7 preview**: OS-user address suffixes (ID\\username), Windows
-            session selection, Linux logind discovery and immutable session
-            binding, plus self-hosted-account UI work. Full simultaneous
-            multi-session Linux X11/Wayland streaming is still experimental
-            and NOT implemented in this preview.
+            **1.7.1**: Addresses can target an OS user (ID\\username);
+            Windows session selection, Linux logind discovery and session
+            binding, and self-hosted-account UI improvements are included.
+            True simultaneous remote streaming of independent Linux user
+            sessions is NOT implemented yet. These features need real-device
+            acceptance testing.
 
             **Automatic updates:** On Debian-based Linux, installed .deb
             packages include a systemd update timer which verifies SHA-256
             release-asset digests and delays installation while remote
             sessions are active. Installed Windows clients check and update
             using their own GitHub release assets. Existing 1.6.x installs
-            need this 1.7 preview installed once before the updater is available.
+            need 1.7.1 installed manually once before auto-update is available.
             macOS and Android updates still require explicit installation.
 
             Updates only come from github.com/mirivlad/mirvdesk-client;

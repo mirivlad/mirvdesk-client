@@ -32,6 +32,10 @@ class UpdateTests(unittest.TestCase):
         releases = [release("v1.7.0-3", True), release("v1.7.0-2", True)]
         self.assertEqual(updater.choose_release(releases, "1.7.0-1", "x86_64")[0], "v1.7.0-3")
         self.assertIsNone(updater.choose_release(releases, "1.7.0-4", "x86_64"))
+        # Normal versioning: a preview can upgrade straight to a stable 1.7.1.
+        stable = release("v1.7.1")
+        self.assertEqual(updater.choose_release(releases + [stable], "1.7.0-3", "x86_64")[0], "v1.7.1")
+        self.assertEqual(updater.choose_release([stable], "1.6.2", "x86_64")[0], "v1.7.1")
 
     def test_rejects_bad_asset_provenance_and_missing_digest(self):
         valid = release("v1.7.0")
@@ -74,16 +78,14 @@ msi_spec.loader.exec_module(msi)
 
 
 class MSIVersionTests(unittest.TestCase):
-    def test_preview_and_stable_msi_versions_increase(self):
-        previews = ["1.7.0-1", "1.7.0-2", "1.7.0-3", "1.7.0", "1.7.1-1", "1.7.1"]
-        converted = [tuple(map(int, msi.mirvdesk_msi_version(v).split("."))) for v in previews]
-        self.assertEqual(converted, sorted(converted))
+    def test_plain_release_versions_equal_msi_versions(self):
+        versions = ["1.6.2", "1.7.0", "1.7.1", "1.7.2", "1.7.3", "1.8.0"]
+        converted = [msi.mirvdesk_msi_version(v) for v in versions]
+        self.assertEqual(converted, versions)
         self.assertEqual(msi.mirvdesk_msi_version("1.7.0-3"), "1.7.3")
-        self.assertEqual(msi.mirvdesk_msi_version("1.7.0"), "1.7.99")
-        self.assertEqual(msi.mirvdesk_msi_version("1.6.2"), "1.6.2")
 
     def test_msi_versions_are_three_numeric_components(self):
-        for bad in ["1.7.0-99", "1.7.0-pre", "1.7.0-3.98767", "1.7.999-1"]:
+        for bad in ["1.7.0-99", "1.7.0-pre", "1.7.0-3.98767", "1.7.999-1", "1.7.1-1"]:
             with self.assertRaises(ValueError):
                 msi.mirvdesk_msi_version(bad)
 

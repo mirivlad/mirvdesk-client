@@ -24,8 +24,8 @@ versions = {
 }
 if None in versions.values():
     fail(f"MirvDesk version metadata is missing: {versions}")
-# Cargo and release asset names include the numeric preview suffix (e.g.
-# 1.7.0-1). Flutter/iOS and pacman pkgver must use X.Y.Z, without a dash.
+# From 1.7.1 releases use normal X.Y.Z everywhere.
+# Historical 1.7.0-N tags needed a base X.Y.Z in Flutter and Arch.
 base = versions["Cargo.toml"].split("-", 1)[0]
 if (versions["flutter-build.yml"] != versions["Cargo.toml"]
         or versions["flutter/pubspec.yaml"] != base
