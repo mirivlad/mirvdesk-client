@@ -261,6 +261,8 @@ pub struct Connection {
     port_forward_address: String,
     tx_to_cm: mpsc::UnboundedSender<ipc::Data>,
     authorized: bool,
+    #[cfg(target_os = "linux")]
+    linux_pinned_session_id: Option<String>,
     require_2fa: Option<totp_rs::TOTP>,
     awaiting_2fa: bool,
     keyboard: bool,
@@ -474,6 +476,8 @@ impl Connection {
             port_forward_address: "".to_owned(),
             tx_to_cm,
             authorized: false,
+            #[cfg(target_os = "linux")]
+            linux_pinned_session_id: None,
             keyboard: Self::permission(keys::OPTION_ENABLE_KEYBOARD, &control_permissions),
             clipboard: Self::permission(keys::OPTION_ENABLE_CLIPBOARD, &control_permissions),
             audio: Self::permission(keys::OPTION_ENABLE_AUDIO, &control_permissions),
@@ -1027,6 +1031,20 @@ impl Connection {
                     }
                 }
                 _ = second_timer.tick() => {
+                    #[cfg(target_os = "linux")]
+                    if let Some(pinned) = conn.linux_pinned_session_id.as_ref() {
+                        // The session ID, not just the account name, is the
+                        // security boundary. Close when the desktop changes.
+                        let sessions = tokio::task::spawn_blocking(
+                            crate::platform::linux::list_graphical_sessions
+                        ).await.unwrap_or_default();
+                        if !crate::platform::linux::pinned_session_is_current(
+                            &sessions, pinned, &conn.lr.os_login.username,
+                        ) {
+                            conn.on_close("Linux graphical session changed", true).await;
+                            break;
+                        }
+                    }
                     #[cfg(windows)]
                     conn.portable_check();
                     raii::AuthedConnID::check_wake_lock_on_setting_changed();
@@ -1759,24 +1777,34 @@ impl Connection {
         }
         #[cfg(target_os = "linux")]
         if self.is_remote() && !self.lr.os_login.username.is_empty() {
-            // This connection's desktop belongs to the process owning the
-            // user --server. The root service currently launches only one
-            // instance for seat0; selecting another account must not switch
-            // the global service (which would hijack other connections).
-            let requested = &self.lr.os_login.username;
-            if crate::username() != *requested {
-                let target = requested.clone();
-                let listed = tokio::task::spawn_blocking(
-                    crate::platform::linux::list_graphical_sessions
-                ).await.unwrap_or_default();
-                let exists = listed.iter().any(|s| s.username == target);
-                let message = if exists {
-                    format!("Linux desktop for '{}' exists, but remote access to a different simultaneous graphical session is not yet supported.", target)
-                } else {
-                    format!("Linux user '{}' is not served by this MirvDesk instance; logind did not report a matching graphical session.", target)
-                };
-                self.send_login_error(message).await;
-                return false;
+            use crate::platform::linux::SessionRoute;
+            let target = self.lr.os_login.username.clone();
+            let serving = crate::username();
+            let listed = tokio::task::spawn_blocking(
+                crate::platform::linux::list_graphical_sessions
+            ).await.unwrap_or_default();
+            match crate::platform::linux::resolve_user_session(&listed, &target, &serving) {
+                SessionRoute::Served(id) => {
+                    // Never follow an already-authorized connection to a
+                    // future seat0 session, even with the same OS username.
+                    if !id.is_empty() {
+                        self.linux_pinned_session_id = Some(id);
+                    }
+                }
+                SessionRoute::Other(ids) => {
+                    self.send_login_error(format!(
+                        "Linux user '{}' has graphical session(s) {:?}, but this host currently cannot route remote desktop to a different logind session.",
+                        target, ids,
+                    )).await;
+                    return false;
+                }
+                SessionRoute::Missing => {
+                    self.send_login_error(format!(
+                        "Linux graphical session for '{}' is not served by this MirvDesk instance.",
+                        target,
+                    )).await;
+                    return false;
+                }
             }
         }
         self.authorized = true;

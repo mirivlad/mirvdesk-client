@@ -118,9 +118,125 @@ fn query_graphical_sessions() -> Vec<GraphicalSession> {
     result
 }
 
+/// A target account may have several graphical desktops. A remote connection
+/// may attach only to the session *already served* by its user --server.
+/// The stable logind session ID is retained for the lifetime of the connection
+/// to detect seat switches even when the Unix username is unchanged.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SessionRoute {
+    Served(String),
+    Other(Vec<String>),
+    Missing,
+}
+
+pub fn resolve_user_session(
+    sessions: &[GraphicalSession],
+    requested: &str,
+    serving_user: &str,
+) -> SessionRoute {
+    let matches: Vec<&GraphicalSession> = sessions
+        .iter()
+        .filter(|s| s.username == requested)
+        .collect();
+    if requested == serving_user {
+        if let Some(current) = matches.iter().find(|s| s.seat == "seat0" && s.active) {
+            return SessionRoute::Served(current.id.clone());
+        }
+        // A manually started X11 session may still appear as Type=tty.
+        // The existing server already serves it, but logind cannot pin it.
+        if matches.is_empty() {
+            return SessionRoute::Served(String::new());
+        }
+    }
+    if matches.is_empty() {
+        SessionRoute::Missing
+    } else {
+        SessionRoute::Other(matches.iter().map(|s| s.id.clone()).collect())
+    }
+}
+
+/// Does the pinned graphical session still own the active seat0? Re-check this
+/// before streaming input/video: another login with the *same username* is
+/// not the same session and must not inherit the old connection.
+pub fn pinned_session_is_current(
+    sessions: &[GraphicalSession],
+    session_id: &str,
+    username: &str,
+) -> bool {
+    sessions
+        .iter()
+        .any(|s| s.id == session_id && s.username == username && s.seat == "seat0" && s.active)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn binds_only_the_served_desktop_not_another_user() {
+        let alice = parse_graphical_session(
+            "3",
+            "Name=alice\nType=x11\nClass=user\nSeat=seat0\nActive=yes\n",
+        )
+        .unwrap();
+        let bob = parse_graphical_session(
+            "6",
+            "Name=bob\nType=wayland\nClass=user\nSeat=\nActive=no\n",
+        )
+        .unwrap();
+        let sessions = vec![alice, bob];
+        assert_eq!(
+            resolve_user_session(&sessions, "alice", "alice"),
+            SessionRoute::Served("3".to_owned())
+        );
+        assert_eq!(
+            resolve_user_session(&sessions, "bob", "alice"),
+            SessionRoute::Other(vec!["6".to_owned()])
+        );
+        assert_eq!(
+            resolve_user_session(&sessions, "nobody", "alice"),
+            SessionRoute::Missing
+        );
+    }
+
+    #[test]
+    fn session_binding_does_not_follow_account_to_new_login() {
+        let old = parse_graphical_session(
+            "3",
+            "Name=alice\nType=x11\nClass=user\nSeat=seat0\nActive=yes\n",
+        )
+        .unwrap();
+        let new = parse_graphical_session(
+            "9",
+            "Name=alice\nType=x11\nClass=user\nSeat=seat0\nActive=yes\n",
+        )
+        .unwrap();
+        assert!(pinned_session_is_current(&[old.clone()], "3", "alice"));
+        assert!(!pinned_session_is_current(&[new.clone()], "3", "alice"));
+        assert!(!pinned_session_is_current(&[old], "3", "bob"));
+        assert_eq!(
+            resolve_user_session(&[new], "alice", "alice"),
+            SessionRoute::Served("9".to_owned())
+        );
+    }
+
+    #[test]
+    fn multiple_sessions_of_one_user_choose_only_active_seat() {
+        let inactive = parse_graphical_session(
+            "5",
+            "Name=alice\nType=x11\nClass=user\nSeat=seat0\nActive=no\n",
+        )
+        .unwrap();
+        let active = parse_graphical_session(
+            "6",
+            "Name=alice\nType=wayland\nClass=user\nSeat=seat0\nActive=yes\n",
+        )
+        .unwrap();
+        assert_eq!(
+            resolve_user_session(&[inactive, active], "alice", "alice"),
+            SessionRoute::Served("6".into())
+        );
+    }
 
     #[test]
     fn listing_deduplicates_and_rejects_bad_ids() {
