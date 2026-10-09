@@ -1811,6 +1811,7 @@ async fn get_http_response_async(
         "get" => http_client.get(url),
         "post" => http_client.post(url),
         "put" => http_client.put(url),
+        "patch" => http_client.patch(url),
         "delete" => http_client.delete(url),
         _ => return Err(anyhow!("The HTTP request method is not supported!")),
     };

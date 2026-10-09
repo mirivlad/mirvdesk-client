@@ -6,7 +6,7 @@ import '../models/platform_model.dart';
 import 'package:flutter_hbb/common.dart';
 export 'package:http/http.dart' show Response;
 
-enum HttpMethod { get, post, put, delete }
+enum HttpMethod { get, post, put, patch, delete }
 
 class HttpService {
   Future<http.Response> sendRequest(
@@ -76,6 +76,11 @@ class HttpService {
               .put(url, headers: headers, body: body)
               .timeout(_requestTimeout);
           break;
+        case HttpMethod.patch:
+          response = await client
+              .patch(url, headers: headers, body: body)
+              .timeout(_requestTimeout);
+          break;
         case HttpMethod.delete:
           response = await client
               .delete(url, headers: headers, body: body)
@@ -136,6 +141,12 @@ Future<http.Response> put(Uri url,
     {Map<String, String>? headers, Object? body, Encoding? encoding}) async {
   return await HttpService()
       .sendRequest(url, HttpMethod.put, body: body, headers: headers);
+}
+
+Future<http.Response> patch(Uri url,
+    {Map<String, String>? headers, Object? body, Encoding? encoding}) async {
+  return await HttpService()
+      .sendRequest(url, HttpMethod.patch, body: body, headers: headers);
 }
 
 Future<http.Response> delete(Uri url,
