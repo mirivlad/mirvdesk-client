@@ -10,6 +10,7 @@ import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
+import 'package:flutter_hbb/desktop/pages/mirvdesk_admin_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
 import 'package:flutter_hbb/mobile/widgets/dialog.dart';
@@ -2152,7 +2153,7 @@ class _AccountState extends State<_Account> {
     return ListView(
       controller: scrollController,
       children: [
-        _Card(title: 'Account', children: [accountAction(), useInfo()]),
+        _Card(title: 'Account', children: [accountAction(), useInfo(), adminShortcut()]),
       ],
     ).marginOnly(bottom: _kListViewBottomMargin);
   }
@@ -2167,6 +2168,20 @@ class _AccountState extends State<_Account> {
                   ? loginDialog()
                   : logOutConfirmDialog()
             }));
+  }
+
+  Widget adminShortcut() {
+    return Obx(() => gFFI.userModel.isAdmin.value &&
+            gFFI.userModel.userName.value.isNotEmpty
+        ? Padding(
+            padding: const EdgeInsets.all(12),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const Text('Управление пользователями и устройствами'),
+              onPressed: MirvDeskAdminPage.open,
+            ),
+          )
+        : const SizedBox.shrink());
   }
 
   Widget useInfo() {

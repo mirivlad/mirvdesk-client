@@ -41,6 +41,13 @@ jobs:
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
+            **1.7.2**: Native administrator console added under
+            Settings → Account → Manage users and devices for signed-in
+            server administrators. Manage users (create/disable/password),
+            groups, device group memberships, device notes and audit history.
+            Requires MirvDesk Server 1.7.1 or newer with administrator API.
+            Windows/Linux user-addressed connections remain available.
+
             **1.7.1**: Addresses can target an OS user (ID\\username);
             Windows session selection, Linux logind discovery and session
             binding, and self-hosted-account UI improvements are included.
