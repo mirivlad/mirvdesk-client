@@ -37,6 +37,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Clipboard is empty", "Буфер обмена пуст"),
         ("Stop service", "Остановить службу"),
         ("Change ID", "Изменить ID"),
+        ("Generate new ID", "Сгенерировать новый ID"),
         ("Your new ID", "Новый ID"),
         ("length %min% to %max%", "длина %min%...%max%"),
         ("starts with a letter", "начинается с буквы"),

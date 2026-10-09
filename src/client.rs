@@ -2684,10 +2684,51 @@ struct ConnToken {
     session_id: u64,
 }
 
+// The target suffix is a *desktop login* on the remote OS; it is not an
+// account for the self-hosted address book. The network peer stays unchanged.
+fn parse_os_session_address(address: &str) -> (String, Option<String>) {
+    let Some((peer, user)) = address.rsplit_once('\\') else {
+        return (address.to_owned(), None);
+    };
+    // Preserve regular peer IDs unless the complete address matches our
+    // intentional suffix grammar. The host remains responsible for routing.
+    if peer.is_empty()
+        || peer.contains('\\')
+        || user.is_empty()
+        || user.len() > 128
+        || user.trim() != user
+        || !user.chars().all(|c| c.is_alphanumeric() || "_.- @".contains(c))
+    {
+        return (address.to_owned(), None);
+    }
+    (peer.to_owned(), Some(user.to_owned()))
+}
+
+#[cfg(test)]
+mod os_session_address_tests {
+    use super::parse_os_session_address;
+
+    #[test]
+    fn parses_user_suffix_without_affecting_peer_address() {
+        assert_eq!(parse_os_session_address("123456789"), ("123456789".into(), None));
+        assert_eq!(parse_os_session_address("123456789\\vasya"), ("123456789".into(), Some("vasya".into())));
+        assert_eq!(parse_os_session_address("123456789@relay.example\\petya"), ("123456789@relay.example".into(), Some("petya".into())));
+    }
+
+    #[test]
+    fn refuses_ambiguous_or_invalid_suffixes() {
+        for address in ["12345\\", "\\foo", "123\\group\\name", "123\\bad/user"] {
+            assert_eq!(parse_os_session_address(address), (address.into(), None));
+        }
+    }
+}
+
 /// Login config handler for [`Client`].
 #[derive(Default)]
 pub struct LoginConfigHandler {
     id: String,
+    // Optional OS login/session target parsed from <peer-id>\\<username>.
+    pub target_os_user: Option<String>,
     pub conn_type: ConnType,
     pub is_terminal_admin: bool,
     hash: Hash,
@@ -2772,6 +2813,8 @@ impl LoginConfigHandler {
         shared_password: Option<String>,
         conn_token: Option<String>,
     ) {
+        let (id, target) = parse_os_session_address(&id);
+        self.target_os_user = target;
         let mut id = id;
         if id.contains("@") {
             let mut v = id.split("@");
@@ -3696,13 +3739,20 @@ impl LoginConfigHandler {
         } else {
             Bytes::new()
         };
+        // OSLogin has an existing username field; for remote-desktop sessions
+        // it is an optional routing hint (without OS credentials), while in
+        // terminal mode it keeps the existing credential semantics.
         let os_login: MessageField<OSLogin> = if self.conn_type == ConnType::TERMINAL {
             Some(OSLogin {
                 username: os_username,
                 password: os_password,
                 ..Default::default()
-            })
-            .into()
+            }).into()
+        } else if let Some(user) = self.target_os_user.as_ref() {
+            Some(OSLogin {
+                username: user.clone(),
+                ..Default::default()
+            }).into()
         } else {
             Default::default()
         };
