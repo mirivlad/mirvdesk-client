@@ -1773,7 +1773,7 @@ impl Connection {
                 let message = if exists {
                     format!("Linux desktop for '{}' exists, but remote access to a different simultaneous graphical session is not yet supported.", target)
                 } else {
-                    format!("Linux graphical session for '{}' was not found on this host.", target)
+                    format!("Linux user '{}' is not served by this MirvDesk instance; logind did not report a matching graphical session.", target)
                 };
                 self.send_login_error(message).await;
                 return false;

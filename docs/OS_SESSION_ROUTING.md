@@ -35,8 +35,10 @@ user's desktop.
 
 **Parallel Linux sessions are not implemented yet.** The next-stage
 read-only session inventory lives in `src/platform/linux_sessions.rs`.
-It enumerates logind sessions (X11/Wayland, not SSH/TTY or greeters) and
-publishes a JSON-encoded list in `PeerInfo.platform_additions` as the scalar
+It enumerates logind sessions explicitly marked X11/Wayland (not SSH/TTY
+or greeters). A desktop started manually with `startx` from a TTY may not
+be classified as graphical by logind; this inventory is advisory, not a
+complete list of all running compositors. It publishes a JSON-encoded list in `PeerInfo.platform_additions` as the scalar
 string `linux_logind_sessions_json` after normal RustDesk authorization.
 Each entry includes `id`, `username`, `type`, `seat`, `state`, `active`
 and provisional `served` information. The inventory cannot itself switch or

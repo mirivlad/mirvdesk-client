@@ -1,7 +1,12 @@
 //! Read-only logind discovery. This deliberately does not select/activate
 //! sessions: changing seat0 would redirect OTHER connections to another user.
 //! Only a per-session media/IPC backend can safely support parallel desktops.
-use std::{collections::HashMap, process::Command};
+use std::{
+    collections::HashMap,
+    process::Command,
+    sync::{Mutex, OnceLock},
+    time::{Duration, Instant},
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphicalSession {
@@ -66,7 +71,25 @@ fn parse_graphical_session(id: &str, properties: &str) -> Option<GraphicalSessio
 
 /// Enumerate graphical logind sessions without creating or switching sessions.
 /// Call via spawn_blocking when invoked from an async connection handler.
+/// A short cache prevents launching many loginctl processes when several
+/// remote connections arrive at once.
 pub fn list_graphical_sessions() -> Vec<GraphicalSession> {
+    static CACHE: OnceLock<Mutex<Option<(Instant, Vec<GraphicalSession>)>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(None));
+    if let Ok(mut guard) = cache.lock() {
+        if let Some((updated, sessions)) = guard.as_ref() {
+            if updated.elapsed() < Duration::from_secs(3) {
+                return sessions.clone();
+            }
+        }
+        let sessions = query_graphical_sessions();
+        *guard = Some((Instant::now(), sessions.clone()));
+        return sessions;
+    }
+    query_graphical_sessions()
+}
+
+fn query_graphical_sessions() -> Vec<GraphicalSession> {
     let Ok(output) = Command::new("loginctl")
         .args(["list-sessions", "--no-legend", "--no-pager"])
         .output()
