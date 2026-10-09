@@ -66,5 +66,27 @@ class UpdateTests(unittest.TestCase):
                 getter.assert_not_called()
 
 
+import importlib.util
+PREPROCESS = pathlib.Path(__file__).resolve().parents[1] / "res/msi/preprocess.py"
+msi_spec = importlib.util.spec_from_file_location("mirvdesk_msi_preprocess", PREPROCESS)
+msi = importlib.util.module_from_spec(msi_spec)
+msi_spec.loader.exec_module(msi)
+
+
+class MSIVersionTests(unittest.TestCase):
+    def test_preview_and_stable_msi_versions_increase(self):
+        previews = ["1.7.0-1", "1.7.0-2", "1.7.0-3", "1.7.0", "1.7.1-1", "1.7.1"]
+        converted = [tuple(map(int, msi.mirvdesk_msi_version(v).split("."))) for v in previews]
+        self.assertEqual(converted, sorted(converted))
+        self.assertEqual(msi.mirvdesk_msi_version("1.7.0-3"), "1.7.3")
+        self.assertEqual(msi.mirvdesk_msi_version("1.7.0"), "1.7.99")
+        self.assertEqual(msi.mirvdesk_msi_version("1.6.2"), "1.6.2")
+
+    def test_msi_versions_are_three_numeric_components(self):
+        for bad in ["1.7.0-99", "1.7.0-pre", "1.7.0-3.98767", "1.7.999-1"]:
+            with self.assertRaises(ValueError):
+                msi.mirvdesk_msi_version(bad)
+
+
 if __name__ == "__main__":
     unittest.main()

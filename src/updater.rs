@@ -3,6 +3,8 @@ use crate::{common::do_check_software_update, hbbs_http::create_http_client_with
 mod mirvdesk_github_update;
 pub use mirvdesk_github_update::github_release_update;
 use hbb_common::{bail, config, log, ResultType};
+#[cfg(target_os = "linux")]
+use hbb_common::tokio;
 use std::{
     io::Write,
     path::{Component, Path, PathBuf},

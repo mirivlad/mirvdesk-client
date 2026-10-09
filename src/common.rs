@@ -1145,6 +1145,13 @@ pub fn check_software_update() {
 // Because the url is always `https://api.rustdesk.com/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    if get_app_name() == "MirvDesk" {
+        // Mobile package updates require OS-specific installation consent.
+        // Never fall through to the upstream RustDesk update endpoint.
+        return Ok(());
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if get_app_name() == "MirvDesk" {
         // reqwest::blocking must never run on a Tokio runtime worker.
         let release = hbb_common::tokio::task::spawn_blocking(
