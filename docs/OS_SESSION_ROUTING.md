@@ -42,7 +42,12 @@ complete list of all running compositors. It publishes a JSON-encoded list in `P
 string `linux_logind_sessions_json` after normal RustDesk authorization.
 Each entry includes `id`, `username`, `type`, `seat`, `state`, `active`
 and provisional `served` information. The inventory cannot itself switch or
-grant a desktop session. Linux connections targeting a non-served OS account
+grant a desktop session. Explicit connections are now pinned to the active
+seat0 logind session ID where available. If that session disappears, becomes
+inactive, or another user/session takes over the desktop, the connection
+closes instead of silently following the username to another desktop.
+TTY-based manual X11 sessions may not expose a graphical logind ID and retain
+the legacy fallback. Linux connections targeting a non-served OS account
 are now rejected *before* creating an authorized connection/audit record,
 and error messages distinguish a discovered graphical session from an
 account with no graphical session.
