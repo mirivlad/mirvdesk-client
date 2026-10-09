@@ -1,6 +1,6 @@
 pkgname=mirvdesk
 pkgver=1.7.0
-pkgrel=1
+pkgrel=2
 epoch=
 pkgdesc="MirvDesk self-hosted remote desktop client"
 arch=('x86_64')

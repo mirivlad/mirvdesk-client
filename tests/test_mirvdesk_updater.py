@@ -50,6 +50,15 @@ class UpdateTests(unittest.TestCase):
         self.assertIsNone(updater.version_key("v1.7.0+bad"))
         self.assertIsNone(updater.choose_release([release("v1.7.0")], "1.6.2", "armv7"))
 
+    def test_bad_download_hash_cannot_run_dpkg(self):
+        import io
+        with mock.patch.object(updater, "host_idle", return_value=True):
+            with mock.patch.object(updater, "open_https", return_value=io.BytesIO(b"sample")):
+                with mock.patch.object(updater.subprocess, "run") as runner:
+                    with self.assertRaises(ValueError):
+                        updater.apply_update(("v1.7.0-2", "https://github.com/...", "0" * 64, 6))
+                    runner.assert_not_called()
+
     def test_busy_host_defers_without_downloading(self):
         with mock.patch.object(updater, "host_idle", return_value=False):
             with mock.patch.object(updater, "open_https") as getter:

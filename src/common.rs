@@ -1146,7 +1146,10 @@ pub fn check_software_update() {
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     if get_app_name() == "MirvDesk" {
-        let release = crate::updater::github_release_update()?;
+        // reqwest::blocking must never run on a Tokio runtime worker.
+        let release = hbb_common::tokio::task::spawn_blocking(
+            crate::updater::github_release_update,
+        ).await??;
         let response_url = release.map(|r| format!(
             "https://github.com/mirivlad/mirvdesk-client/releases/tag/{}", r.tag
         )).unwrap_or_default();
