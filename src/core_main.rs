@@ -390,12 +390,21 @@ pub fn core_main() -> Option<Vec<String>> {
             log::info!("start --uninstall-service");
             crate::platform::uninstall_service(false, true);
             return None;
+        } else if cfg!(target_os = "linux") && args[0] == "--update-idle" {
+            #[cfg(target_os = "linux")]
+            std::process::exit(if crate::updater::linux_host_is_idle_for_update() { 0 } else { 2 });
+            #[cfg(not(target_os = "linux"))]
+            return None;
         } else if args[0] == "--service" {
             log::info!("start --service");
             crate::start_os_service();
             return None;
         } else if args[0] == "--server" {
             log::info!("start --server with user {}", crate::username());
+            #[cfg(target_os = "windows")]
+            if crate::get_app_name() == "MirvDesk" {
+                crate::updater::start_auto_update();
+            }
             #[cfg(target_os = "linux")]
             {
                 hbb_common::allow_err!(crate::platform::check_autostart_config());

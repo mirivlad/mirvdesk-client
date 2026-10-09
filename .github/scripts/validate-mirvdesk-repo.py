@@ -22,7 +22,14 @@ versions = {
     "flutter-build.yml": workflow.group(1) if workflow else None,
     "res/PKGBUILD": pkg.group(1) if pkg else None,
 }
-if None in versions.values() or len(set(versions.values())) != 1:
+if None in versions.values():
+    fail(f"MirvDesk version metadata is missing: {versions}")
+# Cargo and release asset names include the numeric preview suffix (e.g.
+# 1.7.0-1). Flutter/iOS and pacman pkgver must use X.Y.Z, without a dash.
+base = versions["Cargo.toml"].split("-", 1)[0]
+if (versions["flutter-build.yml"] != versions["Cargo.toml"]
+        or versions["flutter/pubspec.yaml"] != base
+        or versions["res/PKGBUILD"] != base):
     fail(f"MirvDesk version metadata is inconsistent: {versions}")
 
 build_rs = read("build.rs")

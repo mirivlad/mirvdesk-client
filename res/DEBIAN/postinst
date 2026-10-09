@@ -20,8 +20,12 @@ if [ "$1" = configure ]; then
 		if [ -e /usr/bin/pkill ]; then
 			sed -i "s|pkill|/usr/bin/pkill|g" /usr/lib/systemd/system/mirvdesk.service
 		fi
+		cp /usr/share/mirvdesk/files/systemd/mirvdesk-update.service /usr/lib/systemd/system/mirvdesk-update.service
+		cp /usr/share/mirvdesk/files/systemd/mirvdesk-update.timer /usr/lib/systemd/system/mirvdesk-update.timer
 		systemctl daemon-reload
 		systemctl enable mirvdesk
 		systemctl start mirvdesk
+		# Do not install while someone is connected; the updater checks all host IPC.
+		systemctl enable --now mirvdesk-update.timer
 	fi
 fi

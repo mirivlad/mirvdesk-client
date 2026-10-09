@@ -1,0 +1,14 @@
+[Unit]
+Description=Install verified MirvDesk updates from its GitHub releases
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/usr/share/mirvdesk/files/mirvdesk-update.py
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /usr/share/mirvdesk/files/mirvdesk-update.py
+TimeoutStartSec=5min
+Nice=10
+NoNewPrivileges=yes
+PrivateTmp=no

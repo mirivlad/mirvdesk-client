@@ -8,6 +8,10 @@ case $1 in
 		rm -f /usr/bin/mirvdesk
 		
 		if [ "systemd" == "${INITSYS}" ]; then
+			if [ "$1" = remove ]; then
+				systemctl disable --now mirvdesk-update.timer >/dev/null 2>&1 || true
+				rm -f /usr/lib/systemd/system/mirvdesk-update.service /usr/lib/systemd/system/mirvdesk-update.timer
+			fi
 
 			systemctl stop mirvdesk || true
 			systemctl disable mirvdesk || true

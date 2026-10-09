@@ -35,26 +35,31 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: MirvDesk ${{ github.ref_name }}
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: false
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
-            **1.6.2** corrects mobile network option retrieval without desktop
-            IPC on iOS and Android, and keeps the delayed relay attempt alive
-            even when direct P2P fails before the fallback timer expires.
+            **1.7 preview**: OS-user address suffixes (ID\\username), Windows
+            session selection, Linux logind discovery and immutable session
+            binding, plus self-hosted-account UI work. Full simultaneous
+            multi-session Linux X11/Wayland streaming is still experimental
+            and NOT implemented in this preview.
 
-            **1.6.1** hedges stalled P2P attempts by starting hbbr relay setup
-            after a short head start, without cancelling the direct attempt.
-            Android discovery now happens before NAT probes, and release CI
-            verifies MIRVDESK_SERVER_URL in each native APK library.
+            **Automatic updates:** On Debian-based Linux, installed .deb
+            packages include a systemd update timer which verifies SHA-256
+            release-asset digests and delays installation while remote
+            sessions are active. Installed Windows clients check and update
+            using their own GitHub release assets. Existing 1.6.x installs
+            need this 1.7 preview installed once before the updater is available.
+            macOS and Android updates still require explicit installation.
+
+            Updates only come from github.com/mirivlad/mirvdesk-client;
+            the upstream RustDesk updater stays disabled for MirvDesk.
 
             Builds require MIRVDESK_SERVER_URL pointing to your own server.
             MirvDesk deliberately ships with no default public server.
-
-            Personal Address Book remains available. Shared address books are not implemented yet. Stock RustDesk auto-update remains disabled so MirvDesk cannot replace itself with an upstream RustDesk build.
-
-            Packages are built by GitHub Actions for Windows, Linux, macOS and Android.
+            CI packages cover Windows, Linux, macOS, and Android.
 
   run-flutter-tag-build:
     needs: prepare-release
@@ -63,4 +68,4 @@ jobs:
     with:
       upload-artifact: true
       upload-tag: ${{ github.ref_name }}
-      prerelease: false
+      prerelease: ${{ contains(github.ref_name, '-') }}

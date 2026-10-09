@@ -1089,7 +1089,7 @@ async fn handle(data: Data, stream: &mut Connection) {
                     .await
             );
         }
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         Data::HasNoActiveConns(None) => {
             allow_err!(
                 stream
