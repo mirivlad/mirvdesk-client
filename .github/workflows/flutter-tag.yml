@@ -41,6 +41,13 @@ jobs:
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
+            **1.7.3**: Automatic discovery of connected rendezvous device
+            identities without account login; signed host-service heartbeats,
+            verified online status, device display names, inventory search
+            and All / My / Accessible scope views. Requires MirvDesk Server
+            with device-registry-v1 support. Device presence and group
+            visibility do not confer remote-control permissions.
+
             **1.7.2**: Native administrator console added under
             Settings → Account → Manage users and devices for signed-in
             server administrators. Manage users (create/disable/password),

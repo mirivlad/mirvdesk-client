@@ -37,6 +37,9 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
   List<Map<String, dynamic>> groups = [];
   List<Map<String, dynamic>> devices = [];
   List<Map<String, dynamic>> audit = [];
+  String deviceScope = 'all';
+  String devicePresence = 'all';
+  String deviceSearch = '';
 
   @override
   void initState() {
@@ -115,7 +118,7 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       final page = await _request(
         'GET',
         path +
-            '?current=' +
+            (path.contains('?') ? '&current=' : '?current=') +
             current.toString() +
             '&pageSize=' +
             perPage.toString(),
@@ -148,7 +151,7 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
       final result = await Future.wait([
         _fetchPaged('/api/admin/users'),
         _fetchPaged('/api/admin/groups'),
-        _fetchPaged('/api/admin/devices'),
+        _fetchPaged('/api/admin/devices?scope=' + deviceScope),
         _fetchPaged('/api/admin/audit'),
       ]);
       if (!mounted) return;
@@ -623,49 +626,161 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
     );
   }
 
-  Widget _deviceList() => ListView.builder(
-    itemCount: devices.length,
-    itemBuilder: (context, i) {
-      final device = devices[i];
-      final names = device['device_group_names'] is List
-          ? (device['device_group_names'] as List).join(', ')
-          : (device['device_group_name'] ?? '').toString();
-      final note = (device['note'] ?? '').toString();
-      final seconds = device['last_account_login'];
-      final lastLogin = seconds is int && seconds > 0
-          ? DateTime.fromMillisecondsSinceEpoch(seconds * 1000)
-                .toLocal()
-                .toString()
-                .substring(0, 16)
-          : '';
-      return ListTile(
-        leading: const Icon(Icons.desktop_windows_outlined),
-        title: Text((device['id'] ?? '').toString()),
-        subtitle: Text(
-          'Owner: ' +
-              (device['user_name'] ?? '').toString() +
-              (names.isEmpty ? '' : ' · ' + names) +
-              (note.isEmpty ? '' : '\n' + note) +
-              (lastLogin.isEmpty ? '' : '\nLast account login: ' + lastLogin),
+  Future<void> _editDeviceDisplayName(Map<String, dynamic> device) async {
+    final id = (device['id'] ?? '').toString();
+    final updated = await _prompt(
+      'Название устройства $id',
+      'Понятное название (не изменяет hostname)',
+      initialValue: (device['display_name'] ?? '').toString(),
+    );
+    if (updated == null || updated.length > 100) return;
+    await _mutation(
+      'PUT',
+      '/api/admin/devices/' + Uri.encodeComponent(id) + '/display-name',
+      {'name': updated},
+    );
+  }
+
+  String _deviceTime(dynamic seconds) {
+    if (seconds is! int || seconds <= 0) return '';
+    return DateTime.fromMillisecondsSinceEpoch(seconds * 1000)
+        .toLocal()
+        .toString()
+        .substring(0, 16);
+  }
+
+  Widget _deviceList() {
+    final filtered = devices.where((device) {
+      final presence = (device['presence'] ?? 'unknown').toString();
+      if (devicePresence != 'all' && presence != devicePresence) return false;
+      final info = device['info'] is Map ? device['info'] as Map : const {};
+      final haystack = [
+        device['id'],
+        device['display_name'],
+        device['user_name'],
+        device['note'],
+        info['name'],
+        info['os'],
+        device['device_group_names'],
+      ].join(' ').toLowerCase();
+      return haystack.contains(deviceSearch.toLowerCase().trim());
+    }).toList();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              DropdownButton<String>(
+                value: deviceScope,
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('Все устройства')),
+                  DropdownMenuItem(value: 'mine', child: Text('Мои устройства')),
+                  DropdownMenuItem(value: 'accessible', child: Text('Доступные мне')),
+                ],
+                onChanged: (value) {
+                  if (value == null || value == deviceScope) return;
+                  setState(() => deviceScope = value);
+                  _reload();
+                },
+              ),
+              DropdownButton<String>(
+                value: devicePresence,
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('Любое состояние')),
+                  DropdownMenuItem(value: 'online', child: Text('В сети')),
+                  DropdownMenuItem(value: 'offline', child: Text('Не в сети')),
+                  DropdownMenuItem(value: 'unknown', child: Text('Не проверено')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => devicePresence = value);
+                },
+              ),
+              SizedBox(
+                width: 240,
+                child: TextField(
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Поиск по ID, имени, группе...',
+                  ),
+                  onChanged: (value) => setState(() => deviceSearch = value),
+                ),
+              ),
+              Text('Показано: ' + filtered.length.toString() + ' / ' + devices.length.toString()),
+            ],
+          ),
         ),
-        isThreeLine: note.isNotEmpty || lastLogin.isNotEmpty,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              tooltip: 'Edit device note',
-              icon: const Icon(Icons.edit_note_outlined),
-              onPressed: () => _editDeviceNote(device),
-            ),
-            OutlinedButton(
-              onPressed: () => _editDeviceGroups(device),
-              child: const Text('Edit groups'),
-            ),
-          ],
+        const Divider(height: 1),
+        Expanded(
+          child: ListView.builder(
+            itemCount: filtered.length,
+            itemBuilder: (context, i) {
+              final device = filtered[i];
+              final id = (device['id'] ?? '').toString();
+              final info = device['info'] is Map ? device['info'] as Map : const {};
+              final hostname = (info['name'] ?? '').toString();
+              final os = (info['os'] ?? '').toString();
+              final arch = (info['arch'] ?? '').toString();
+              final version = (info['version'] ?? '').toString();
+              final alias = (device['display_name'] ?? '').toString();
+              final owner = (device['user_name'] ?? '').toString();
+              final note = (device['note'] ?? '').toString();
+              final names = device['device_group_names'] is List
+                  ? (device['device_group_names'] as List).join(', ')
+                  : (device['device_group_name'] ?? '').toString();
+              final presence = (device['presence'] ?? 'unknown').toString();
+              final label = presence == 'online'
+                  ? 'В сети'
+                  : (presence == 'offline' ? 'Не в сети' : 'Нет подтверждённого heartbeat');
+              final lastSeen = _deviceTime(device['last_seen_at']);
+              final lastLogin = _deviceTime(device['last_account_login']);
+              return ListTile(
+                leading: Icon(
+                  presence == 'online' ? Icons.check_circle : Icons.computer,
+                  color: presence == 'online' ? Colors.green : null,
+                ),
+                title: Text(alias.isNotEmpty ? '$alias · $id' : (hostname.isNotEmpty ? '$hostname · $id' : id)),
+                subtitle: Text([
+                  'ID: $id · $label' + (lastSeen.isNotEmpty ? ' · $lastSeen' : ''),
+                  [hostname, os, arch, version.isEmpty ? '' : 'MirvDesk $version']
+                      .where((part) => part.isNotEmpty).join(' · '),
+                  owner.isEmpty ? 'Не назначено владельцу' : 'Владелец: $owner',
+                  names.isEmpty ? 'Без группы' : 'Группы: $names',
+                  if (lastLogin.isNotEmpty) 'Последний вход в аккаунт: $lastLogin',
+                  if (note.isNotEmpty) 'Примечание: $note',
+                ].where((part) => part.isNotEmpty).join('\n')),
+                isThreeLine: true,
+                trailing: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  children: [
+                    IconButton(
+                      tooltip: 'Изменить название',
+                      icon: const Icon(Icons.drive_file_rename_outline),
+                      onPressed: () => _editDeviceDisplayName(device),
+                    ),
+                    IconButton(
+                      tooltip: 'Примечание',
+                      icon: const Icon(Icons.edit_note_outlined),
+                      onPressed: () => _editDeviceNote(device),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => _editDeviceGroups(device),
+                      child: const Text('Группы'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
-      );
-    },
-  );
+      ],
+    );
+  }
 
   Widget _auditList() => ListView.builder(
     itemCount: audit.length,
