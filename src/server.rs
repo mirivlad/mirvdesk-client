@@ -70,6 +70,7 @@ pub mod input_service {
 
 mod connection;
 mod login_failure_check;
+mod device_registry;
 pub(crate) mod port_forward_mux;
 pub mod display_service;
 #[cfg(windows)]
@@ -574,6 +575,7 @@ pub fn check_zombie() {
 #[cfg(any(target_os = "android", target_os = "ios"))]
 #[tokio::main]
 pub async fn start_server(_is_server: bool) {
+    tokio::spawn(device_registry::heartbeat_loop());
     crate::RendezvousMediator::start_all().await;
 }
 
@@ -642,6 +644,8 @@ pub async fn start_server(is_server: bool, no_server: bool) {
         crate::platform::try_kill_broker();
         #[cfg(feature = "hwcodec")]
         scrap::hwcodec::start_check_process();
+        // One signed heartbeat loop per host service, never per GUI account.
+        tokio::spawn(device_registry::heartbeat_loop());
         crate::RendezvousMediator::start_all().await;
     } else {
         match crate::ipc::connect(1000, "").await {
