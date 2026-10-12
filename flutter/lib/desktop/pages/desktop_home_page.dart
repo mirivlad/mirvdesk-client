@@ -714,7 +714,19 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         systemError = error;
         setState(() {});
       }
-      final v = await mainGetBoolOption(kOptionStopService);
+      var v = await mainGetBoolOption(kOptionStopService);
+      if (isLinux && bind.mainIsInstalled()) {
+        try {
+          final state = await Process.run('systemctl',
+              ['is-active', 'mirvdesk.service']);
+          if (state.exitCode == 0 || state.stdout.toString().trim() == 'inactive' ||
+              state.stdout.toString().trim() == 'failed') {
+            v = state.exitCode != 0;
+          }
+        } catch (_) {
+          // Fall back to the existing setting when systemd is unavailable.
+        }
+      }
       if (v != svcStopped.value) {
         svcStopped.value = v;
         setState(() {});
