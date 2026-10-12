@@ -1069,7 +1069,10 @@ fn force_stop_server() {
 }
 
 pub fn start_os_service() {
-    check_if_stop_service();
+    // A systemd start is authoritative; ignore stale GUI stop requests.
+    if Config::get_option("stop-service") == "Y" {
+        Config::set_option("stop-service".into(), "".into());
+    }
     stop_rustdesk_servers();
     start_uinput_service();
 
@@ -2722,15 +2725,6 @@ pub fn install_service() -> bool {
         Config::set_option("stop-service".into(), "Y".into());
     }
     true
-}
-
-fn check_if_stop_service() {
-    if Config::get_option("stop-service".into()) == "Y" {
-        let app_name = crate::get_app_name().to_lowercase();
-        allow_err!(run_cmds(&format!(
-            "systemctl disable {app_name}; systemctl stop {app_name}"
-        )));
-    }
 }
 
 pub fn check_autostart_config() -> ResultType<()> {
