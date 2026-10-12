@@ -7118,6 +7118,7 @@ dependencies = [
  "libpulse-binding",
  "libpulse-simple-binding",
  "libxdo-sys",
+ "log",
  "mac_address",
  "magnum-opus",
  "nix 0.29.0",
