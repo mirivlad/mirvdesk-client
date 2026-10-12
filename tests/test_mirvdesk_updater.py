@@ -65,9 +65,21 @@ class UpdateTests(unittest.TestCase):
 
     def test_busy_host_defers_without_downloading(self):
         with mock.patch.object(updater, "host_idle", return_value=False):
-            with mock.patch.object(updater, "open_https") as getter:
-                updater.apply_update(("v1.7.0", "https://github.com/...", "a" * 64, 12))
-                getter.assert_not_called()
+            with mock.patch.object(updater, "defer_until_idle") as retry:
+                with mock.patch.object(updater, "open_https") as getter:
+                    updater.apply_update(("v1.7.0", "https://github.com/...", "a" * 64, 12))
+                    getter.assert_not_called()
+                    retry.assert_called_once_with()
+
+    def test_deferred_update_uses_transient_fifteen_minute_timer(self):
+        with mock.patch.object(updater.os, "getpid", return_value=123):
+            with mock.patch.object(updater.subprocess, "run") as runner:
+                updater.defer_until_idle()
+                runner.assert_called_once_with([
+                    "systemd-run", "--quiet", "--on-active=15min",
+                    "--unit=mirvdesk-update-retry-123",
+                    "/usr/bin/systemctl", "start", "--no-block", "mirvdesk-update.service",
+                ], check=True, timeout=15)
 
 
 import importlib.util

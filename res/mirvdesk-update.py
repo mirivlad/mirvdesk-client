@@ -98,9 +98,21 @@ def host_idle():
                           capture_output=True, timeout=25).returncode == 0
 
 
+def defer_until_idle():
+    # A transient one-shot timer avoids waiting for the next daily check.
+    # The host-idle guard is checked again at the next attempt.
+    subprocess.run([
+        "systemd-run", "--quiet", "--on-active=15min",
+        f"--unit=mirvdesk-update-retry-{os.getpid()}",
+        "/usr/bin/systemctl", "start", "--no-block", "mirvdesk-update.service",
+    ], check=True, timeout=15)
+    print("MirvDesk update postponed; retry scheduled in 15 minutes.")
+
+
 def apply_update(release):
     tag, url, digest, size = release
     if not host_idle():
+        defer_until_idle()
         print("MirvDesk remote session is active or unknown; update deferred.")
         return
     with tempfile.TemporaryDirectory(prefix="mirvdesk-update-", dir="/var/tmp") as td:
@@ -120,6 +132,7 @@ def apply_update(release):
         if received != size or checksum.hexdigest() != digest:
             raise ValueError("Update checksum or size verification failed")
         if not host_idle():
+            defer_until_idle()
             print("Remote session began during download; update deferred.")
             return
         print(f"Installing verified MirvDesk {tag} ({received} bytes)")
