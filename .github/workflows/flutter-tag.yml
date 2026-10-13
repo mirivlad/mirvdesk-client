@@ -41,6 +41,14 @@ jobs:
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
+            **1.7.7**: Fix duplicate Linux tray icons after login when
+            MirvDesk and the desktop panel start at the same time. The client
+            re-registers its existing indicator after the panel appears,
+            allowing libayatana-appindicator to remove the leftover legacy
+            icon. No system library changes are required. Legacy-only trays
+            keep their existing behavior; panel restarts and menu actions
+            were verified with an isolated GTK/D-Bus smoke test.
+
             **1.7.3**: Automatic discovery of connected rendezvous device
             identities without account login; signed host-service heartbeats,
             verified online status, device display names, inventory search
