@@ -1,4 +1,7 @@
 use super::{gtk_sudo, CursorData, ResultType};
+#[path = "linux_tray.rs"]
+mod linux_tray;
+pub use linux_tray::{watch_tray_registration, TrayRegistrationGuard};
 #[path = "linux_sessions.rs"]
 mod linux_sessions;
 pub use linux_sessions::{list_graphical_sessions, pinned_session_is_current, resolve_user_session, GraphicalSession, SessionRoute};

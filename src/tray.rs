@@ -96,6 +96,8 @@ fn make_tray() -> hbb_common::ResultType<()> {
         }
     };
     let mut _tray_icon: Arc<Mutex<Option<TrayIcon>>> = Default::default();
+    #[cfg(target_os = "linux")]
+    let mut _linux_tray_registration: Option<crate::platform::linux::TrayRegistrationGuard> = None;
 
     let menu_channel = MenuEvent::receiver();
     let tray_channel = TrayEvent::receiver();
@@ -174,6 +176,13 @@ fn make_tray() -> hbb_common::ResultType<()> {
                     log::error!("Failed to create tray icon: {}", err);
                 }
             };
+
+            #[cfg(target_os = "linux")]
+            {
+                _linux_tray_registration = _tray_icon.lock().unwrap().as_ref().and_then(|tray| {
+                    crate::platform::linux::watch_tray_registration(tray, &tray_menu)
+                });
+            }
 
             // We have to request a redraw here to have the icon actually show up.
             // Tao only exposes a redraw method on the Window so we use core-foundation directly.
