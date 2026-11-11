@@ -41,6 +41,12 @@ jobs:
           body: |
             MirvDesk ${{ github.ref_name }} is a self-hosted remote desktop client based on RustDesk.
 
+            **1.7.8**: Improve password visibility controls for account login
+            and native administrator dialogs. The Show/Hide button is clearer
+            and accessible by keyboard, and passwords remain masked by
+            default. Resetting or creating accounts no longer requires
+            entering an uninspectable password.
+
             **1.7.7**: Fix duplicate Linux tray icons after login when
             MirvDesk and the desktop panel start at the same time. The client
             re-registers its existing indicator after the panel appears,
