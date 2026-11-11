@@ -30,6 +30,48 @@ class MirvDeskAdminPage extends StatefulWidget {
   State<MirvDeskAdminPage> createState() => _MirvDeskAdminPageState();
 }
 
+/// Reusable masked input: the toggle never changes the controller value.
+class _AdminPasswordField extends StatefulWidget {
+  const _AdminPasswordField({
+    required this.controller,
+    required this.label,
+    this.autofocus = false,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final bool autofocus;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  State<_AdminPasswordField> createState() => _AdminPasswordFieldState();
+}
+
+class _AdminPasswordFieldState extends State<_AdminPasswordField> {
+  bool _visible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: widget.controller,
+      autofocus: widget.autofocus,
+      obscureText: !_visible,
+      autocorrect: false,
+      enableSuggestions: false,
+      onSubmitted: widget.onSubmitted,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        suffixIcon: IconButton(
+          tooltip: _visible ? 'Hide password' : 'Show password',
+          icon: Icon(_visible ? Icons.visibility_off : Icons.visibility),
+          onPressed: () => setState(() => _visible = !_visible),
+        ),
+      ),
+    );
+  }
+}
+
 class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
   bool loading = false;
   String? error;
@@ -186,15 +228,21 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: Text(title),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            obscureText: password,
-            decoration: InputDecoration(labelText: label),
-            onSubmitted: (value) =>
-                Navigator.of(dialogContext)
-                    .pop(password ? value : value.trim()),
-          ),
+          content: password
+              ? _AdminPasswordField(
+                  controller: controller,
+                  label: label,
+                  autofocus: true,
+                  onSubmitted: (value) =>
+                      Navigator.of(dialogContext).pop(value),
+                )
+              : TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(labelText: label),
+                  onSubmitted: (value) =>
+                      Navigator.of(dialogContext).pop(value.trim()),
+                ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
@@ -251,12 +299,9 @@ class _MirvDeskAdminPageState extends State<MirvDeskAdminPage> {
                   controller: displayName,
                   decoration: const InputDecoration(labelText: 'Display name'),
                 ),
-                TextField(
+                _AdminPasswordField(
                   controller: password,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Initial password (at least 10 characters)',
-                  ),
+                  label: 'Initial password (at least 10 characters)',
                 ),
                 const SizedBox(height: 8),
                 const Text('New accounts are created as regular users.'),
