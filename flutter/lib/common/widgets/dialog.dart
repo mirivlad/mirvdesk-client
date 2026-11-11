@@ -897,12 +897,14 @@ class _PasswordWidgetState extends State<PasswordWidget> {
       controller: widget.controller,
       prefixIcon: DialogTextField.kPasswordIcon,
       suffixIcon: IconButton(
+        tooltip: _passwordVisible
+            ? translate('Hide password')
+            : translate('Show password'),
         icon: Icon(
-            // Based on passwordVisible state choose the icon
-            _passwordVisible ? Icons.visibility : Icons.visibility_off,
-            color: MyTheme.lightTheme.primaryColor),
+          _passwordVisible ? Icons.visibility_off : Icons.visibility,
+          color: Theme.of(context).colorScheme.primary,
+        ),
         onPressed: () {
-          // Update the state i.e. toggle the state of passwordVisible variable
           setState(() {
             _passwordVisible = !_passwordVisible;
           });
